@@ -80,3 +80,8 @@ export function adjustPose(p:Player,a:{pose?:unknown;leftArm?:unknown;rightArm?:
 export function moveHeight(p:Player,dz:number,dt:number,mapId:MapId='art'){if(p.locked||p.caught||!Number.isFinite(dz)||!Number.isFinite(dt))return;const z=Math.max(0,Math.min(MAX_ELEVATION,(p.elevation||0)+Math.max(-1,Math.min(1,dz))*.9*Math.max(0,Math.min(.3,dt))));const from=p.elevation||0,steps=Math.max(1,Math.ceil(Math.abs(z-from)/.05));for(let i=1;i<=steps;i++){const next=from+(z-from)*i/steps;if(!canStand(p.x,p.y,mapId,next,bodyHeight(p.pose)))break;p.elevation=next;}}
 
 export function stepHeight(r:Room,p:Player,direction:unknown,now:number){if(direction!==1&&direction!==-1)return false;if(r.paused||p.caught||p.locked||r.phase==='result'||p.role==='seeker'&&r.phase!=='seek'||now-(p.heightStepAt||0)<180)return false;p.heightStepAt=now;moveHeight(p,direction,1/6,roomSettings(r).mapId);return true;}
+
+export function hidingSpots(mapId:MapId){
+ const cover=mapCover(mapId);return [.35,3.65,7.7].flatMap((base,i)=>{const candidates=cover.filter(o=>o.kind.startsWith('wall')&&o.base===base&&o.y<100&&o.w>200);for(let j=0;j<candidates.length;j++){const o=candidates[(i+j)%candidates.length],x=o.x+o.w/2,y=o.y+o.h+35;if(canStand(x,y,mapId,base))return [{x,y,elevation:base,label:i===0?'쉬운 자리':i===1?'중간 높이':'높은 자리'}];}return [];});
+}
+export function showHidingHints(r:Room|null,id:string,enabled:boolean,preview=false){const p=r?.players.find(p=>p.id===id);return !!(enabled&&!preview&&r&&!r.paused&&['paint','hide'].includes(r.phase)&&p?.role==='hider'&&!p.caught);}
