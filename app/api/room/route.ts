@@ -1,3 +1,4 @@
+import {classroomState} from '../../classroom';
 import {packPaint,unpackPaint} from '../../paint-codec';
 import { database } from '../../../db/raw';
 import { DEFAULT_SETTINGS,parseSettings,roomSettings,adjustPose,advance,attachToWall,catchTarget,makePlayer,makeRoom,move,moveHeight,nextPhase,publicRoom,type Room } from '../../game';
@@ -8,9 +9,10 @@ export async function POST(req:Request){try{
  if(req.headers.get('origin')&&req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'다른 사이트에서는 요청할 수 없어요.'},403);
  const raw=await req.text();if(raw.length>250000)return reply({error:'요청이 너무 커요.'},413);
  const a=JSON.parse(raw),db=database(),now=Date.now();
+ const gate=await classroomState();if(!gate.open)return reply({closed:true,error:'선생님이 모든 게임을 종료했어요.'},423);
  if(a.action==='create'){const settings=a.settings===undefined?{...DEFAULT_SETTINGS}:parseSettings(a.settings);if(!settings)return reply({error:'방 설정을 확인해 주세요.'},400);
  const token=crypto.randomUUID(),id=crypto.randomUUID(),name=String(a.name||'선생님').trim().slice(0,12)||'선생님';
- for(let i=0;i<4;i++){const bytes=crypto.getRandomValues(new Uint8Array(6)),alphabet='ABCDEFGHJKMNPQRSTUVWXYZ23456789',code=Array.from(bytes,b=>alphabet[b%alphabet.length]).join('');const p=makePlayer(id,name,now);p.token=token;const r=makeRoom(code,p);r.settings=settings;const saved=await db.prepare('INSERT OR IGNORE INTO rooms(code,state,version,expires) VALUES(?,?,0,?)').bind(code,JSON.stringify(wireRoom(r)),now+86400000).run();if(saved.meta.changes)return reply({room:wireRoom(publicRoom(r,id)),id,token,serverTime:now});}throw new Error('방을 만들지 못했어요. 다시 시도해 주세요.');
+ for(let i=0;i<4;i++){const bytes=crypto.getRandomValues(new Uint8Array(6)),alphabet='ABCDEFGHJKMNPQRSTUVWXYZ23456789',code=Array.from(bytes,b=>alphabet[b%alphabet.length]).join('');const p=makePlayer(id,name,now);p.token=token;const r=makeRoom(code,p);r.settings=settings;const saved=await db.prepare('INSERT OR IGNORE INTO rooms(code,state,version,expires) SELECT ?,?,0,? WHERE EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(code,JSON.stringify(wireRoom(r)),now+86400000,gate.revision).run();if(saved.meta.changes)return reply({room:wireRoom(publicRoom(r,id)),id,token,serverTime:now});}throw new Error('방을 만들지 못했어요. 다시 시도해 주세요.');
  }
  const code=String(a.code||'').toUpperCase();if(!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드 6자리를 확인해 주세요.'},400);
  for(let retry=0;retry<8;retry++){
@@ -27,7 +29,7 @@ export async function POST(req:Request){try{
  else if(['next','pause','end','kick'].includes(a.action)){if(r.host!==p.id)return reply({error:'방장만 진행할 수 있어요.'},403);if(a.action==='next'){if(r.paused)return reply({error:'먼저 이어하기를 눌러 주세요.'},409);if(r.players.length<2)return reply({error:'두 명 이상 모이면 시작할 수 있어요.'},409);nextPhase(r,now);}if(a.action==='pause'){if(r.phase==='lobby'||r.phase==='result')return reply({error:'진행 중일 때 잠시 멈출 수 있어요.'},409);if(r.paused){r.end+=now-r.paused;r.paused=0;r.players.forEach(q=>q.moveAt=now);}else r.paused=now;}if(a.action==='end'){r.phase='result';r.winner='선생님이 게임을 마쳤어요';r.paused=0;r.end=0;}if(a.action==='kick'){r.players=r.players.filter(q=>q.id===r.host||q.id!==a.target);advance(r,now);}}
  else if(a.action==='leave'){r.players=r.players.filter(q=>q.id!==p!.id);if(r.host===p.id&&r.players.length)r.host=r.players[0].id;if(!r.players.length){await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();return reply({left:true});}if(!r.players.some(q=>q.role==='seeker')&&!['lobby','result'].includes(r.phase)){r.phase='result';r.winner='술래가 나가서 판이 끝났어요';}advance(r,now);}
  else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
- p.last=now;const result=await db.prepare('UPDATE rooms SET state=?,version=version+1 WHERE code=? AND version=?').bind(JSON.stringify(wireRoom(r)),code,row.version).run();if(result.meta.changes)return reply({room:wireRoom(publicRoom(r,p.id)),id:p.id,...(token?{token}:{}),serverTime:now});
+ p.last=now;const result=await db.prepare('UPDATE rooms SET state=?,version=version+1 WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(wireRoom(r)),code,row.version,now,gate.revision).run();if(result.meta.changes)return reply({room:wireRoom(publicRoom(r,p.id)),id:p.id,...(token?{token}:{}),serverTime:now});
  }return reply({error:'잠시 연결이 밀렸어요. 다시 시도해 주세요.'},503);
  }catch(e){console.error('room request',e);return reply({error:'연결하지 못했어요. 잠시 후 다시 시도해 주세요.'},500);}}
 
