@@ -2,8 +2,9 @@
 import {useEffect,useRef,useState,type MutableRefObject} from 'react';
 import {brushContains,type BrushShape} from './brush';
 import * as THREE from 'three';
+import {buildTheme} from './theme-world';
 import {applyPoseRig,poseLift,poseCenter} from './pose-rig';
-import {roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
+import {MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
 export type SceneInput={dx:number;dy:number;dz?:number;yaw:number};
 export type ViewMode='move'|'paint'|'look';
 export type SceneHandle={centerTarget:()=>string;shoot:()=>string;previewView:(side:number)=>void;resetView:()=>void;rotateView:(delta:number)=>void;zoom:(delta:number)=>void};
@@ -30,15 +31,15 @@ function setPose(model:ReturnType<typeof mannequin>,pose:Pose,leftArm?:number,ri
 export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),current=useRef(props),[failed,setFailed]=useState(false);current.current=props;
  useEffect(()=>{if(!host.current)return;const container=host.current;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{setFailed(true);return;}
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label','3D 숨바꼭질 맵: 드래그로 둘러보고 캐릭터에 직접 색칠하세요');renderer.domElement.tabIndex=0;
- const scene=new THREE.Scene();scene.background=new THREE.Color('#bcc6be');scene.fog=new THREE.Fog('#bcc6be',18,35);const camera=new THREE.PerspectiveCamera(58,1,.04,60);scene.add(new THREE.HemisphereLight('#ffefd4','#83908c',2));const sun=new THREE.DirectionalLight('#ffdfb2',2.4);sun.position.set(4,9,6);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-10;scene.add(sun);
+ const scene=new THREE.Scene();scene.background=new THREE.Color('#bcc6be');scene.fog=new THREE.Fog('#bcc6be',32,65);const camera=new THREE.PerspectiveCamera(58,1,.04,90);scene.add(new THREE.HemisphereLight('#ffefd4','#83908c',2));const sun=new THREE.DirectionalLight('#ffdfb2',2.4);sun.position.set(4,9,6);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-10;scene.add(sun);
  const blockers:THREE.Mesh[]=[],surfaces:THREE.Mesh[]=[],textures:THREE.Texture[]=[];
  function material(type:'brick'|'wood'|'leaf'|'floor'|'blue',rx=1,ry=1){const t=textureCanvas(type);t.repeat.set(rx,ry);textures.push(t);return new THREE.MeshStandardMaterial({map:t,roughness:1,metalness:0});}
- function box(x:number,y:number,z:number,w:number,h:number,d:number,mat:THREE.Material,solid=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);m.receiveShadow=true;m.castShadow=true;scene.add(m);surfaces.push(m);if(solid)blockers.push(m);return m;}
+ function box(x:number,y:number,z:number,w:number,h:number,d:number,mat:THREE.Material,solid=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w*MAP_SCALE,h,d*MAP_SCALE),mat);m.position.set(x*MAP_SCALE,y,z*MAP_SCALE);m.receiveShadow=true;m.castShadow=true;scene.add(m);surfaces.push(m);if(solid)blockers.push(m);return m;}
  const mapId=props.room?roomSettings(props.room).mapId:'art';
  if(mapId==='art'){
  box(9,-.08,5.7,18,.16,11.4,material('floor',7.5,4.5));
- box(9,3.3,0,18,6.6,.15,material('brick',9,3.3));box(0,3.3,5.7,.15,6.6,11.4,material('wood',1,3.2));box(18,3.3,5.7,.15,6.6,11.4,material('brick',5.7,3.3));box(9,3.3,11.4,18,6.6,.15,material('wood',9,3.3));
- box(9,6.68,5.7,18,.16,11.4,material('wood',6,4));
+ box(9,CEILING_HEIGHT/2,0,18,CEILING_HEIGHT,.15,material('brick',9,3.3));box(0,CEILING_HEIGHT/2,5.7,.15,CEILING_HEIGHT,11.4,material('wood',1,3.2));box(18,CEILING_HEIGHT/2,5.7,.15,CEILING_HEIGHT,11.4,material('brick',5.7,3.3));box(9,CEILING_HEIGHT/2,11.4,18,CEILING_HEIGHT,.15,material('wood',9,3.3));
+ box(9,CEILING_HEIGHT+.08,5.7,18,.16,11.4,material('wood',6,4));
  WALLS.slice(0,WALLS.length-CAMO_PROPS.length).forEach((w,i)=>{const h=OBSTACLE_HEIGHTS[i];box((w.x+w.w/2)/100,h/2,(w.y+w.h/2)/100,w.w/100,h,w.h/100,material(i===0?'brick':i===2?'blue':i===4||i===5?'leaf':'wood',i===0?1.4:1,Math.max(1,h/2)));});
  // Functional camouflage backdrops mounted on the room walls.
  box(1.3,1.4,.11,1.7,2.5,.04,material('leaf',1,1.5),false);box(9,1.1,.12,1.5,2.1,.05,material('blue',1,1),false);
@@ -83,52 +84,16 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  }
  const trim=new THREE.MeshStandardMaterial({color:'#4c4a3c'});for(let z=.8;z<11.4;z+=2.2){box(.13,6.1,z,.12,.14,1.8,trim,false);box(17.87,6.1,z,.12,.14,1.8,trim,false);}box(9,6.35,5.7,.17,.18,11.4,trim,false);
 
- }else{
- const forest=mapId==='forest',flat=(color:string)=>new THREE.MeshBasicMaterial({color});
- scene.background=new THREE.Color(forest?'#afd5df':'#f3dbbd');scene.fog=new THREE.Fog(forest?'#afd5df':'#f3dbbd',20,38);
- box(9,-.08,5.7,18,.16,11.4,forest?flat('#90a471'):flat('#e7cfaa'));
- const wallMat=forest?material('leaf',7,2):flat('#f2d8af');
- box(9,3.3,0,18,6.6,.15,wallMat);box(0,3.3,5.7,.15,6.6,11.4,wallMat);box(18,3.3,5.7,.15,6.6,11.4,wallMat);box(9,3.3,11.4,18,6.6,.15,wallMat);
- if(!forest){
-  box(9,6.68,5.7,18,.16,11.4,flat('#e6eef1'));
-  const colors=['#ed5353','#f0bd4c','#569be0','#70b65b'];
-  for(let i=0;i<24;i++)box(.45+i*.74,1.5,.13,.36,3,.07,flat(colors[i%4]),false);
-  for(let i=0;i<18;i++)box(.6+i*.97,2,11.25,.8,4,.08,flat(colors[(i+2)%4]),false);
-  for(let i=0;i<9;i++)box(2+i%3*1.2,.008,3+Math.floor(i/3)*1.2,1.15,.016,1.15,flat(colors[i%4]),false);
- }else{
-  // Mark the shared start clearing with a tan trail; the rest is grass.
-  box(9,.008,6.9,17.5,.016,1.5,flat('#c5b88b'),false);
-  for(let i=0;i<18;i++)box(.25+i,2.4,.16,.34,4.8,.16,material('wood'),false);
-  for(let i=0;i<12;i++)box(17.82,2.3,.5+i*.88,.14,4.6,.32,material('wood'),false);
- }
- for(const o of mapObstacles(mapId)){
-  const x=(o.x+o.w/2)/100,z=(o.y+o.h/2)/100,w=o.w/100,d=o.h/100,h=o.height;
-  if(o.kind==='blocks'){
-   const colors=[o.color,'#f0bd4c','#ed5353','#569be0'];const levels=Math.ceil(h/.8);
-   for(let i=0;i<levels;i++){box(x,(i+.5)*h/levels,z,w,h/levels,d,flat(colors[i%4]));box(x,(i+.5)*h/levels,z+d/2+.007,w*.5,.09,.014,flat('#ffffff'),false);}
-  }else if(o.kind==='gift'){
-   box(x,h/2,z,w,h,d,flat(o.color));box(x,h/2,z+d/2+.009,w*.16,h,.018,flat('#f2eee2'),false);box(x,h*.6,z+d/2+.012,w,h*.12,.024,flat('#f2eee2'),false);box(x,h+.006,z,w*.16,.012,d,flat('#f2eee2'),false);
-  }else if(o.kind==='tree'){
-   box(x,h/2,z,w,h,d,material('wood',1,2));
-   // Canopy stays inside its shared collision bounds.
-   box(x,h*.72,z,w+.005,h*.56,d+.005,flat(o.color));
-   box(x-w*.22,h*.75,z+d/2+.007,w*.22,h*.34,.014,flat('#789568'),false);
-  }else if(o.kind==='tent'){
-   box(x,h/2,z,w,h,d,flat(o.color));
-   // Triangular doorway and seams painted on the tent's solid canvas front.
-   const cv=document.createElement('canvas');cv.width=cv.height=256;const ctx=cv.getContext('2d')!;ctx.fillStyle=o.color;ctx.fillRect(0,0,256,256);ctx.fillStyle='#344637';ctx.beginPath();ctx.moveTo(128,35);ctx.lineTo(220,256);ctx.lineTo(36,256);ctx.closePath();ctx.fill();ctx.strokeStyle='#f2eee2';ctx.lineWidth=5;ctx.stroke();const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;textures.push(tex);box(x,h/2,z+d/2+.008,w,h,.016,new THREE.MeshBasicMaterial({map:tex}),false);
-  }else if(o.kind==='rock'){
-   box(x,h/2,z,w,h,d,flat(o.color));box(x-w*.2,h*.75,z+d/2+.006,w*.32,h*.2,.012,flat('#b5bbaa'),false);
-  }else{box(x,h/2,z,w,h,d,material('wood',2,1));box(x+w/2+.006,h/2,z,.012,h*.8,d*.8,flat('#c19b6d'),false);}
- }
- }
+ // Reachable upper gallery: large, flat camouflage panels at the new heights.
+ for(let i=0;i<7;i++){box(1.4+i*2.5,9,.13,2,3.6,.08,flat(bookColors[i%6]),false);for(let j=0;j<4;j++)box(.65+i*2.5+j*.45,9,.19,.13,3.5,.04,flat(bookColors[(i+j+2)%6]),false);}
+ }else{buildTheme(mapId,scene,box,textures);}
  const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,startX=0,startY=0,paintDrag=false,button=0;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let wasPreview=false;let targetCenter=new THREE.Vector3(5.8,1,1.1);
  function cast(clientX:number,clientY:number){const rect=renderer.domElement.getBoundingClientRect();pointer.set((clientX-rect.left)/rect.width*2-1,-(clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);return ray.intersectObjects([...surfaces,...Array.from(models.values()).filter(m=>m.group.visible).flatMap(m=>m.meshes)],false);}
  function targetAt(x:number,y:number){const hits=cast(x,y),hit=hits[0];return hit?.object.userData.playerId||'';}
  // A lightweight toy blaster follows the first-person camera; it never blocks aiming rays.
  scene.add(camera);const blaster=new THREE.Group();camera.add(blaster);blaster.position.set(.27,-.24,-.43);
  const gunMaterial=new THREE.MeshBasicMaterial({color:'#45c7d1'}),orange=new THREE.MeshBasicMaterial({color:'#ffb94f'});
- function gunPart(w:number,h:number,d:number,x:number,y:number,z:number,mat:THREE.Material){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);m.position.set(x,y,z);blaster.add(m);return m;}
+ function gunPart(w:number,h:number,d:number,x:number,y:number,z:number,mat:THREE.Material){const m=new THREE.Mesh(new THREE.BoxGeometry(w*MAP_SCALE,h,d*MAP_SCALE),mat);m.position.set(x*MAP_SCALE,y,z*MAP_SCALE);blaster.add(m);return m;}
  gunPart(.17,.15,.34,0,0,0,gunMaterial);gunPart(.12,.23,.1,0,-.14,.08,orange);gunPart(.2,.12,.08,0,.01,-.21,orange);gunPart(.05,.05,.08,0,.1,-.06,orange);
  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:'#fff5ad',transparent:true,opacity:.9}));muzzle.position.set(0,.01,-.28);blaster.add(muzzle);muzzle.visible=false;
  const beam=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:'#ffdc72',transparent:true,opacity:.85}));scene.add(beam);beam.visible=false;let shotAt=-1000;
