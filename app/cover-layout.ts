@@ -1,5 +1,20 @@
 export type Cover={x:number;y:number;w:number;h:number;base:number;height:number;color:string;kind:string};
 
+export function coverShape(o:Cover){return ['balloon','leaves','jellyfish','planet','skull','bone','tentacle','branch','skeleton'].includes(o.kind)?'ellipsoid':o.kind==='ring'?'ring':'box';}
+export function coverContains(o:Cover,x:number,y:number,z:number){
+ const nx=(x-o.x-o.w/2)/(o.w/2),ny=(y-o.y-o.h/2)/(o.h/2),nz=(z-o.base-o.height/2)/(o.height/2),shape=coverShape(o);
+ if(shape==='ellipsoid')return nx*nx+ny*ny+nz*nz<=1;
+ if(shape==='ring'){const r=nx*nx+ny*ny;return Math.abs(nz)<=1&&r<=1&&r>=.65*.65;}
+ return Math.abs(nx)<=1&&Math.abs(ny)<=1&&Math.abs(nz)<=1;
+}
+export function coverOverlaps(o:Cover,x:number,y:number,z:number,height:number){
+ const dx=Math.max(0,Math.abs(x-o.x-o.w/2)-18)/(o.w/2),dy=Math.max(0,Math.abs(y-o.y-o.h/2)-18)/(o.h/2);
+ const dz=Math.max(0,Math.abs(z+height/2-o.base-o.height/2)-height/2)/(o.height/2),shape=coverShape(o);
+ if(shape==='ellipsoid')return dx*dx+dy*dy+dz*dz<1;
+ if(shape==='ring'){const farX=(Math.abs(x-o.x-o.w/2)+18)/(o.w/2),farY=(Math.abs(y-o.y-o.h/2)+18)/(o.h/2);return dz<1&&dx*dx+dy*dy<1&&farX*farX+farY*farY>.65*.65;}
+ return dx<1&&dy<1&&dz<1;
+}
+
 // Every visible block is also a server-side volume. Empty space under hanging
 // decorations stays empty for movement and shots, including between branches.
 export function createCover(theme:string,scale:number):Cover[]{

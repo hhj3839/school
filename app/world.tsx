@@ -2,6 +2,7 @@
 import {useEffect,useRef,useState,type MutableRefObject} from 'react';
 import {brushContains,type BrushShape} from './brush';
 import * as THREE from 'three';
+import {coverShape} from './cover-layout';
 import {buildTheme} from './theme-world';
 import {applyPoseRig,poseLift,poseCenter} from './pose-rig';
 import {mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
@@ -88,7 +89,15 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  for(let i=0;i<7;i++){box(1.4+i*2.5,9,.13,2,3.6,.08,flat(bookColors[i%6]),false);for(let j=0;j<4;j++)box(.65+i*2.5+j*.45,9,.19,.13,3.5,.04,flat(bookColors[(i+j+2)%6]),false);}
  }else{buildTheme(mapId,scene,box,textures);}
  const coverMaterials=new Map<string,THREE.Material>();
- for(const o of mapCover(mapId)){if(!coverMaterials.has(o.color))coverMaterials.set(o.color,new THREE.MeshBasicMaterial({color:o.color}));box((o.x+o.w/2)/100/MAP_SCALE,o.base+o.height/2,(o.y+o.h/2)/100/MAP_SCALE,o.w/100/MAP_SCALE,o.height,o.h/100/MAP_SCALE,coverMaterials.get(o.color)!);}
+ for(const o of mapCover(mapId)){
+  if(!coverMaterials.has(o.color))coverMaterials.set(o.color,new THREE.MeshBasicMaterial({color:o.color}));
+  const mat=coverMaterials.get(o.color)!,shape=coverShape(o);
+  if(shape==='box'){box((o.x+o.w/2)/100/MAP_SCALE,o.base+o.height/2,(o.y+o.h/2)/100/MAP_SCALE,o.w/100/MAP_SCALE,o.height,o.h/100/MAP_SCALE,mat);continue;}
+  let geometry:THREE.BufferGeometry;
+  if(shape==='ellipsoid')geometry=new THREE.SphereGeometry(1,24,16);
+  else{const ring=new THREE.Shape();ring.absarc(0,0,1,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,.65,0,Math.PI*2,true);ring.holes.push(hole);geometry=new THREE.ExtrudeGeometry(ring,{depth:2,bevelEnabled:false,curveSegments:32});geometry.translate(0,0,-1);geometry.rotateX(-Math.PI/2);}
+  const mesh=new THREE.Mesh(geometry,mat);mesh.position.set((o.x+o.w/2)/100,o.base+o.height/2,(o.y+o.h/2)/100);mesh.scale.set(o.w/200,o.height/2,o.h/200);scene.add(mesh);surfaces.push(mesh);blockers.push(mesh);
+ }
  const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,startX=0,startY=0,paintDrag=false,button=0;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let wasPreview=false;let targetCenter=new THREE.Vector3(5.8,1,1.1);
  function cast(clientX:number,clientY:number){const rect=renderer.domElement.getBoundingClientRect();pointer.set((clientX-rect.left)/rect.width*2-1,-(clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);return ray.intersectObjects([...surfaces,...Array.from(models.values()).filter(m=>m.group.visible).flatMap(m=>m.meshes)],false);}
  function targetAt(x:number,y:number){const hits=cast(x,y),hit=hits[0];return hit?.object.userData.playerId||'';}

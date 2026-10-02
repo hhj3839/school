@@ -1,4 +1,4 @@
-import {createCover} from './cover-layout';
+import {createCover,coverContains,coverOverlaps} from './cover-layout';
 export const MAP_SCALE=Math.sqrt(3);
 export const W=1800*MAP_SCALE,H=1140*MAP_SCALE,SPEED=250,PAINT_SIZE=128;
 export const SHOT_COOLDOWN=800,SHOT_RANGE=750;
@@ -32,7 +32,7 @@ export function mapCover(mapId:MapId='art'){return covers[normalizeMapId(mapId)]
 export function mapName(mapId:MapId='art'){return MAPS.find(m=>m.id===normalizeMapId(mapId))!.name;}
 export const CEILING_HEIGHT=13.2,MAX_ELEVATION=9.2;
 export type Pose='stand'|'arms'|'crouch'|'lie'|'slim'|'curl'|'side'|'flat';
-export type Player={id:string;token?:string;name:string;paint:string[];paintVersion?:number;x:number;y:number;angle?:number;elevation?:number;pose?:Pose;leftArm?:number;rightArm?:number;locked?:boolean;role:'hider'|'seeker';caught:boolean;last:number;moveAt:number;catchAt:number};
+export type Player={id:string;token?:string;name:string;paint:string[];paintVersion?:number;x:number;y:number;angle?:number;elevation?:number;pose?:Pose;leftArm?:number;rightArm?:number;locked?:boolean;role:'hider'|'seeker';caught:boolean;last:number;moveAt:number;catchAt:number;heightStepAt?:number};
 export type RoomSettings={paintSeconds:number;hideSeconds:number;seekSeconds:number;maxPlayers:number;seekerCount:number;mapId:MapId};
 export const DEFAULT_SETTINGS:RoomSettings={paintSeconds:180,hideSeconds:0,seekSeconds:120,maxPlayers:6,seekerCount:1,mapId:'art'};
 export function parseSettings(value:unknown):RoomSettings|null{if(!value||typeof value!=='object')return null;const v=value as RoomSettings,seekerCount=v.seekerCount===undefined?1:v.seekerCount,mapId=(v.mapId as string)==='toys'?'amusement':v.mapId===undefined?'art':v.mapId;if(!MAPS.some(m=>m.id===mapId)||!Number.isInteger(seekerCount)||seekerCount<1||seekerCount>=v.maxPlayers||![60,120,180,300].includes(v.paintSeconds)||![0,15,30,60].includes(v.hideSeconds)||![60,120,180,300].includes(v.seekSeconds)||!Number.isInteger(v.maxPlayers)||v.maxPlayers<2||v.maxPlayers>20)return null;return {paintSeconds:v.paintSeconds,hideSeconds:v.hideSeconds,seekSeconds:v.seekSeconds,maxPlayers:v.maxPlayers,seekerCount,mapId};}
@@ -48,11 +48,11 @@ export function patternPaint(pattern:'brick'|'wood'|'leaf'|'plain'){
 }
 export function makePlayer(id:string,name:string,now:number):Player{return {id,name,paint:defaultPaint(),x:560*MAP_SCALE,y:700*MAP_SCALE,angle:Math.PI,pose:'stand',locked:false,role:'hider',caught:false,last:now,moveAt:now,catchAt:0};}
 export function makeRoom(code:string,p:Player):Room{return {code,host:p.id,phase:'lobby',end:0,paused:0,round:0,players:[p],winner:'',message:''};}
-export function canStand(x:number,y:number,mapId:MapId='art',elevation=0,bodyHeight=1.7){return x>=28&&y>=28&&x<=W-28&&y<=H-28&&!mapObstacles(mapId).some(r=>elevation<r.height&&x>r.x-18&&x<r.x+r.w+18&&y>r.y-18&&y<r.y+r.h+18)&&!mapCover(mapId).some(r=>elevation<r.base+r.height&&elevation+bodyHeight>r.base&&x>r.x-18&&x<r.x+r.w+18&&y>r.y-18&&y<r.y+r.h+18);}
+export function canStand(x:number,y:number,mapId:MapId='art',elevation=0,bodyHeight=1.7){return x>=28&&y>=28&&x<=W-28&&y<=H-28&&!mapObstacles(mapId).some(r=>elevation<r.height&&x>r.x-18&&x<r.x+r.w+18&&y>r.y-18&&y<r.y+r.h+18)&&!mapCover(mapId).some(r=>coverOverlaps(r,x,y,elevation,bodyHeight));}
 export function move(p:Player,dx:number,dy:number,dt:number,mapId:MapId='art'){if(p.locked||![dx,dy,dt].every(Number.isFinite))return;const n=Math.hypot(dx,dy);if(!n)return;const d=SPEED*Math.min(Math.max(dt,0),.3),steps=Math.max(1,Math.ceil(d/8));for(let i=0;i<steps;i++){const x=p.x+dx/n*d/steps,y=p.y+dy/n*d/steps;if(canStand(x,p.y,mapId,p.elevation||0,bodyHeight(p.pose)))p.x=x;if(canStand(p.x,y,mapId,p.elevation||0,bodyHeight(p.pose)))p.y=y;}p.angle=Math.atan2(dx,dy);}
 export function bodyHeight(pose?:Pose){return pose==='curl'?.75:pose==='side'?.7:pose==='lie'?.65:pose==='crouch'?1:1.7;}
 export function poseHeight(pose?:Pose){return pose==='curl'?.42:pose==='side'?.4:pose==='lie'?.35:pose==='crouch'?.55:1;}
-export function visibleLine(a:Player,b:Player,mapId:MapId='art'){const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/3);for(let i=0;i<=steps;i++){const t=i/Math.max(steps,1),x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;const from=(a.elevation||0)+(a.role==='seeker'?1.48:poseHeight(a.pose)),to=(b.elevation||0)+poseHeight(b.pose),height=from+(to-from)*t;if(mapObstacles(mapId).some(r=>height<=r.height&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))return false;if(mapCover(mapId).some(r=>height>=r.base&&height<=r.base+r.height&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))return false;}return true;}
+export function visibleLine(a:Player,b:Player,mapId:MapId='art'){const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/3);for(let i=0;i<=steps;i++){const t=i/Math.max(steps,1),x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;const from=(a.elevation||0)+(a.role==='seeker'?1.48:poseHeight(a.pose)),to=(b.elevation||0)+poseHeight(b.pose),height=from+(to-from)*t;if(mapObstacles(mapId).some(r=>height<=r.height&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))return false;if(mapCover(mapId).some(r=>coverContains(r,x,y,height)))return false;}return true;}
 export function nextPhase(r:Room,now:number){
  if(r.phase==='lobby'||r.phase==='result'){if(r.players.length<=roomSettings(r).seekerCount)return;r.round++;r.phase='paint';r.end=now+roomSettings(r).paintSeconds*1000;r.winner='';r.message='';r.players.forEach((p,i)=>{p.role=(i-(r.round-1)%r.players.length+r.players.length)%r.players.length<roomSettings(r).seekerCount?'seeker':'hider';p.caught=false;p.x=(380+(i%10)*65)*MAP_SCALE;p.y=(650+Math.floor(i/10)*65)*MAP_SCALE;p.angle=Math.PI;p.elevation=0;p.pose='stand';delete p.leftArm;delete p.rightArm;p.locked=false;p.moveAt=now;p.catchAt=0;});}
  else if(r.phase==='paint'){r.phase='seek';r.end=now+roomSettings(r).seekSeconds*1000;r.message='숨기 시간 끝! 술래가 출발해요.';}
@@ -78,3 +78,5 @@ export function adjustPose(p:Player,a:{pose?:unknown;leftArm?:unknown;rightArm?:
 }
 
 export function moveHeight(p:Player,dz:number,dt:number,mapId:MapId='art'){if(p.locked||p.caught||!Number.isFinite(dz)||!Number.isFinite(dt))return;const z=Math.max(0,Math.min(MAX_ELEVATION,(p.elevation||0)+Math.max(-1,Math.min(1,dz))*.9*Math.max(0,Math.min(.3,dt))));const from=p.elevation||0,steps=Math.max(1,Math.ceil(Math.abs(z-from)/.05));for(let i=1;i<=steps;i++){const next=from+(z-from)*i/steps;if(!canStand(p.x,p.y,mapId,next,bodyHeight(p.pose)))break;p.elevation=next;}}
+
+export function stepHeight(r:Room,p:Player,direction:unknown,now:number){if(direction!==1&&direction!==-1)return false;if(r.paused||p.caught||p.locked||r.phase==='result'||p.role==='seeker'&&r.phase!=='seek'||now-(p.heightStepAt||0)<180)return false;p.heightStepAt=now;moveHeight(p,direction,1/6,roomSettings(r).mapId);return true;}
