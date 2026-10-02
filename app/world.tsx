@@ -2,10 +2,10 @@
 import {useEffect,useRef,useState,type MutableRefObject} from 'react';
 import {brushContains,type BrushShape} from './brush';
 import * as THREE from 'three';
-import {coverShape} from './cover-layout';
+import {solidRenderer} from './solid-renderer';
 import {buildTheme} from './theme-world';
 import {applyPoseRig,poseLift,poseCenter} from './pose-rig';
-import {hidingSpots,showHidingHints,mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
+import {hidingSpots,showHidingHints,mapGround,mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
 export type SceneInput={dx:number;dy:number;dz?:number;yaw:number};
 export type ViewMode='move'|'paint'|'look';
 export type SceneHandle={centerTarget:()=>string;shoot:()=>string;previewView:(side:number)=>void;resetView:()=>void;rotateView:(delta:number)=>void;zoom:(delta:number)=>void};
@@ -78,26 +78,14 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  for(let i=0;i<16;i++)box(7.1+i*.24,1.55,11.25,.24,3.1,.08,flat(stripes[i%4]),false);
  box(8.9,3.17,11.2,4.1,.1,.18,shelf,false);
  // Solid props use exactly the same footprint and height as server collision and sight lines.
- for(const p of CAMO_PROPS){const cx=(p.x+p.w/2)/100,cz=(p.y+p.h/2)/100,w=p.w/100,d=p.h/100;
-  if(p.kind==='plant'){box(cx,.26,cz,w,.52,d,flat('#ad6246'));box(cx,(p.height+.52)/2,cz,w,p.height-.52,d,flat('#68875d'));box(cx-w*.24,1.05,cz+d/2+.006,w*.22,.48,.01,flat('#3d5d42'),false);}
-  else if(p.kind==='crates'){box(cx,p.height/2,cz,w,p.height,d,material('wood'));for(const y of [.12,.55,1])box(cx,y,cz+d/2+.01,w,.055,.025,shelf,false);box(cx, .55,cz+d/2+.02,.07,p.height,.03,shelf,false);}
-  else {for(let i=0;i<5;i++)box(cx,(i+.5)*p.height/5,cz,w,p.height/5,d,flat(stripes[i%4]));for(let i=0;i<5;i++)box(cx,(i+.5)*p.height/5,cz+d/2+.008,w*.82,p.height/5*.58,.014,flat('#f2eee2'),false);}
- }
  const trim=new THREE.MeshStandardMaterial({color:'#4c4a3c'});for(let z=.8;z<11.4;z+=2.2){box(.13,6.1,z,.12,.14,1.8,trim,false);box(17.87,6.1,z,.12,.14,1.8,trim,false);}box(9,6.35,5.7,.17,.18,11.4,trim,false);
 
  // Reachable upper gallery: large, flat camouflage panels at the new heights.
  for(let i=0;i<7;i++){box(1.4+i*2.5,9,.13,2,3.6,.08,flat(bookColors[i%6]),false);for(let j=0;j<4;j++)box(.65+i*2.5+j*.45,9,.19,.13,3.5,.04,flat(bookColors[(i+j+2)%6]),false);}
  }else{buildTheme(mapId,scene,box,textures);}
- const coverMaterials=new Map<string,THREE.Material>();
- for(const o of mapCover(mapId)){
-  if(!coverMaterials.has(o.color))coverMaterials.set(o.color,new THREE.MeshBasicMaterial({color:o.color}));
-  const mat=coverMaterials.get(o.color)!,shape=coverShape(o);
-  if(shape==='box'){box((o.x+o.w/2)/100/MAP_SCALE,o.base+o.height/2,(o.y+o.h/2)/100/MAP_SCALE,o.w/100/MAP_SCALE,o.height,o.h/100/MAP_SCALE,mat);continue;}
-  let geometry:THREE.BufferGeometry;
-  if(shape==='ellipsoid')geometry=new THREE.SphereGeometry(1,24,16);
-  else{const ring=new THREE.Shape();ring.absarc(0,0,1,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,.65,0,Math.PI*2,true);ring.holes.push(hole);geometry=new THREE.ExtrudeGeometry(ring,{depth:2,bevelEnabled:false,curveSegments:32});geometry.translate(0,0,-1);geometry.rotateX(-Math.PI/2);}
-  const mesh=new THREE.Mesh(geometry,mat);mesh.position.set((o.x+o.w/2)/100,o.base+o.height/2,(o.y+o.h/2)/100);mesh.scale.set(o.w/200,o.height/2,o.h/200);scene.add(mesh);surfaces.push(mesh);blockers.push(mesh);
- }
+ const drawSolids=solidRenderer(scene,surfaces,blockers);
+ drawSolids(mapGround(mapId).filter(o=>mapId!=='art'||o.kind!=='art'),true);
+ drawSolids(mapCover(mapId));
  const hintGroup=new THREE.Group();scene.add(hintGroup);
  for(const [i,spot] of hidingSpots(mapId).entries()){
   const cv=document.createElement('canvas');cv.width=256;cv.height=128;const ctx=cv.getContext('2d')!;ctx.fillStyle='#d0ec92';ctx.beginPath();ctx.roundRect(4,4,248,120,24);ctx.fill();ctx.fillStyle='#193526';ctx.font='bold 30px sans-serif';ctx.textAlign='center';ctx.fillText((i+1)+' · '+spot.label,128,58);ctx.font='22px sans-serif';ctx.fillText('나에게만 보이는 안내',128,96);const tex=new THREE.CanvasTexture(cv);textures.push(tex);const marker=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,depthWrite:false,opacity:.88,transparent:true}));marker.position.set(spot.x/100,spot.elevation+1.3,spot.y/100);marker.scale.set(2.4,1.2,1);marker.renderOrder=10;hintGroup.add(marker);

@@ -9,7 +9,7 @@ for(const {id} of MAPS){
  assert.equal(new Set(room.players.map(p=>p.x+','+p.y)).size,20);
  const o=mapObstacles(id)[0],a=makePlayer('a','a',10000),b=makePlayer('b','b',10000);a.x=o.x-30;a.y=o.y+o.h/2;a.role='seeker';b.x=o.x+o.w+30;b.y=a.y;
  assert.equal(canStand(o.x+o.w/2,o.y+o.h/2,id),false);
- assert.equal(visibleLine(a,b,id),false);move(a,1,0,.3,id);assert.ok(a.x<o.x-18);
+ assert.equal(visibleLine(a,b,id),false);move(a,1,0,.3,id);assert.ok(canStand(a.x,a.y,id),'movement finishes outside actual prop solids');
 }
 assert.notDeepEqual(mapObstacles('amusement'),mapObstacles('forest'));
 console.log('PASS: map validation, legacy fallback, 20 clear spawn points per map, unique layouts, collision and sight lines');

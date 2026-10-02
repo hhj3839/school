@@ -1,3 +1,4 @@
+import {groundParts} from './ground-parts';
 import {createCover,coverContains,coverOverlaps} from './cover-layout';
 export const MAP_SCALE=Math.sqrt(3);
 export const W=1800*MAP_SCALE,H=1140*MAP_SCALE,SPEED=250,PAINT_SIZE=128;
@@ -18,13 +19,15 @@ export const MAPS=[
 export type MapObstacle={x:number;y:number;w:number;h:number;height:number;kind:string;color:string};
 const prop=(x:number,y:number,w:number,h:number,height:number,kind:string,color:string):MapObstacle=>({x,y,w,h,height,kind,color});
 const layouts:Record<MapId,MapObstacle[]>={
- art:WALLS.map((w,i)=>({...w,height:OBSTACLE_HEIGHTS[i],kind:'art',color:'#ad8051'})),
+ art:WALLS.map((w,i)=>({...w,height:OBSTACLE_HEIGHTS[i],kind:i<WALLS.length-CAMO_PROPS.length?'art':CAMO_PROPS[i-(WALLS.length-CAMO_PROPS.length)].kind,color:'#ad8051'})),
  amusement:[prop(180,120,200,100,5.8,'wheel','#569be0'),prop(600,120,150,100,3,'booth','#ed5353'),prop(980,100,180,100,3.3,'booth','#f0bd4c'),prop(1410,140,200,150,4.5,'carousel','#b377ce'),prop(170,420,130,110,2,'gift','#70b65b'),prop(730,390,210,90,2.8,'booth','#eb89ac'),prop(1200,460,110,100,2,'gift','#569be0'),prop(1550,560,110,100,3,'blocks','#f0bd4c'),prop(170,850,180,130,3,'blocks','#ed5353'),prop(570,890,180,100,2,'gift','#b377ce'),prop(960,900,180,110,3.2,'booth','#569be0'),prop(1390,850,200,150,5,'wheel','#ed5353')],
  forest:[prop(230,130,110,110,10.5,'tree','#3d5d42'),prop(520,230,100,100,8.5,'tree','#68875d'),prop(960,120,240,190,2.6,'tent','#d2a65c'),prop(1460,150,120,120,11,'tree','#3d5d42'),prop(1260,480,150,100,1.3,'rock','#89938a'),prop(220,840,260,65,.85,'log','#78532f'),prop(730,900,100,100,9,'tree','#68875d'),prop(1340,870,250,150,2.4,'tent','#689399'),prop(170,440,95,95,7,'tree','#4f7140'),prop(730,430,120,80,1.7,'rock','#89938a'),prop(1630,550,85,85,10,'tree','#3d5d42'),prop(1020,940,180,60,1,'log','#78532f')],
  ocean:[prop(190,120,170,110,4,'coral','#ed7891'),prop(600,160,170,110,5,'reef','#456c79'),prop(980,100,280,150,3.8,'ship','#78532f'),prop(1480,150,110,100,7.8,'kelp','#358b73'),prop(180,460,180,100,2,'chest','#ad8051'),prop(730,400,160,120,3.5,'coral','#b377ce'),prop(1250,470,130,100,5.8,'reef','#426882'),prop(1580,570,100,100,7,'kelp','#358b73'),prop(180,870,200,140,3,'reef','#689399'),prop(590,900,200,100,2,'chest','#ad8051'),prop(990,870,170,130,4.2,'coral','#f0bd4c'),prop(1420,890,180,100,6,'kelp','#358b73')],
  museum:[prop(180,120,140,100,5.5,'column','#d8cdb6'),prop(570,120,190,85,3.4,'exhibit','#456c79'),prop(1030,140,210,80,3.6,'painting','#ab8055'),prop(1460,120,140,100,7,'column','#d8cdb6'),prop(170,440,170,100,3.2,'vase','#ad6246'),prop(700,410,200,110,3.6,'fossil','#b7ab8f'),prop(1220,450,210,80,3.6,'painting','#436966'),prop(1570,540,100,100,8.5,'column','#d8cdb6'),prop(180,860,210,100,3.6,'painting','#923f37'),prop(580,900,170,100,3.5,'vase','#689399'),prop(990,900,190,100,3.2,'exhibit','#dbba79'),prop(1400,860,200,120,4,'fossil','#b7ab8f')]
 };
 const scaledLayouts=Object.fromEntries(Object.entries(layouts).map(([id,items])=>[id,items.map(o=>({...o,x:o.x*MAP_SCALE,y:o.y*MAP_SCALE,w:o.w*MAP_SCALE,h:o.h*MAP_SCALE}))])) as Record<MapId,MapObstacle[]>;
+const ground=Object.fromEntries(Object.entries(scaledLayouts).map(([id,items])=>[id,items.flatMap(groundParts)]));
+export function mapGround(mapId:MapId='art'){return ground[normalizeMapId(mapId)];}
 export function normalizeMapId(id:unknown):MapId{return id==='toys'?'amusement':MAPS.some(m=>m.id===id)?id as MapId:'art';}
 export function mapObstacles(mapId:MapId='art'):MapObstacle[]{return scaledLayouts[normalizeMapId(mapId)];}
 const covers=Object.fromEntries(MAPS.map(m=>[m.id,createCover(m.id,MAP_SCALE)]));
@@ -48,11 +51,11 @@ export function patternPaint(pattern:'brick'|'wood'|'leaf'|'plain'){
 }
 export function makePlayer(id:string,name:string,now:number):Player{return {id,name,paint:defaultPaint(),x:560*MAP_SCALE,y:700*MAP_SCALE,angle:Math.PI,pose:'stand',locked:false,role:'hider',caught:false,last:now,moveAt:now,catchAt:0};}
 export function makeRoom(code:string,p:Player):Room{return {code,host:p.id,phase:'lobby',end:0,paused:0,round:0,players:[p],winner:'',message:''};}
-export function canStand(x:number,y:number,mapId:MapId='art',elevation=0,bodyHeight=1.7){return x>=28&&y>=28&&x<=W-28&&y<=H-28&&!mapObstacles(mapId).some(r=>elevation<r.height&&x>r.x-18&&x<r.x+r.w+18&&y>r.y-18&&y<r.y+r.h+18)&&!mapCover(mapId).some(r=>coverOverlaps(r,x,y,elevation,bodyHeight));}
+export function canStand(x:number,y:number,mapId:MapId='art',elevation=0,bodyHeight=1.7){return x>=28&&y>=28&&x<=W-28&&y<=H-28&&!mapGround(mapId).some(r=>coverOverlaps(r,x,y,elevation,bodyHeight))&&!mapCover(mapId).some(r=>coverOverlaps(r,x,y,elevation,bodyHeight));}
 export function move(p:Player,dx:number,dy:number,dt:number,mapId:MapId='art'){if(p.locked||![dx,dy,dt].every(Number.isFinite))return;const n=Math.hypot(dx,dy);if(!n)return;const d=SPEED*Math.min(Math.max(dt,0),.3),steps=Math.max(1,Math.ceil(d/8));for(let i=0;i<steps;i++){const x=p.x+dx/n*d/steps,y=p.y+dy/n*d/steps;if(canStand(x,p.y,mapId,p.elevation||0,bodyHeight(p.pose)))p.x=x;if(canStand(p.x,y,mapId,p.elevation||0,bodyHeight(p.pose)))p.y=y;}p.angle=Math.atan2(dx,dy);}
 export function bodyHeight(pose?:Pose){return pose==='curl'?.75:pose==='side'?.7:pose==='lie'?.65:pose==='crouch'?1:1.7;}
 export function poseHeight(pose?:Pose){return pose==='curl'?.42:pose==='side'?.4:pose==='lie'?.35:pose==='crouch'?.55:1;}
-export function visibleLine(a:Player,b:Player,mapId:MapId='art'){const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/3);for(let i=0;i<=steps;i++){const t=i/Math.max(steps,1),x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;const from=(a.elevation||0)+(a.role==='seeker'?1.48:poseHeight(a.pose)),to=(b.elevation||0)+poseHeight(b.pose),height=from+(to-from)*t;if(mapObstacles(mapId).some(r=>height<=r.height&&x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))return false;if(mapCover(mapId).some(r=>coverContains(r,x,y,height)))return false;}return true;}
+export function visibleLine(a:Player,b:Player,mapId:MapId='art'){const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/3);for(let i=0;i<=steps;i++){const t=i/Math.max(steps,1),x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;const from=(a.elevation||0)+(a.role==='seeker'?1.48:poseHeight(a.pose)),to=(b.elevation||0)+poseHeight(b.pose),height=from+(to-from)*t;if(mapGround(mapId).some(r=>coverContains(r,x,y,height)))return false;if(mapCover(mapId).some(r=>coverContains(r,x,y,height)))return false;}return true;}
 export function nextPhase(r:Room,now:number){
  if(r.phase==='lobby'||r.phase==='result'){if(r.players.length<=roomSettings(r).seekerCount)return;r.round++;r.phase='paint';r.end=now+roomSettings(r).paintSeconds*1000;r.winner='';r.message='';r.players.forEach((p,i)=>{p.role=(i-(r.round-1)%r.players.length+r.players.length)%r.players.length<roomSettings(r).seekerCount?'seeker':'hider';p.caught=false;p.x=(380+(i%10)*65)*MAP_SCALE;p.y=(650+Math.floor(i/10)*65)*MAP_SCALE;p.angle=Math.PI;p.elevation=0;p.pose='stand';delete p.leftArm;delete p.rightArm;p.locked=false;p.moveAt=now;p.catchAt=0;});}
  else if(r.phase==='paint'){r.phase='seek';r.end=now+roomSettings(r).seekSeconds*1000;r.message='숨기 시간 끝! 술래가 출발해요.';}
@@ -66,7 +69,7 @@ export function publicRoom(r:Room,id:string){const me=r.players.find(p=>p.id===i
 
 export function attachToWall(p:Player,mapId:MapId='art'){
  const candidates=[{x:p.x,y:28,angle:0},{x:p.x,y:H-28,angle:Math.PI},{x:28,y:p.y,angle:Math.PI/2},{x:W-28,y:p.y,angle:-Math.PI/2}];
- for(const w of [...mapObstacles(mapId).map(w=>({...w,base:0})),...mapCover(mapId)]){if((p.elevation||0)+bodyHeight(p.pose)<=w.base||(p.elevation||0)>=w.base+w.height)continue;if(p.y>=w.y&&p.y<=w.y+w.h)candidates.push({x:w.x-20,y:p.y,angle:-Math.PI/2},{x:w.x+w.w+20,y:p.y,angle:Math.PI/2});if(p.x>=w.x&&p.x<=w.x+w.w)candidates.push({x:p.x,y:w.y-20,angle:Math.PI},{x:p.x,y:w.y+w.h+20,angle:0});}
+ for(const w of [...mapGround(mapId),...mapCover(mapId)]){if((p.elevation||0)+bodyHeight(p.pose)<=w.base||(p.elevation||0)>=w.base+w.height)continue;if(p.y>=w.y&&p.y<=w.y+w.h)candidates.push({x:w.x-20,y:p.y,angle:-Math.PI/2},{x:w.x+w.w+20,y:p.y,angle:Math.PI/2});if(p.x>=w.x&&p.x<=w.x+w.w)candidates.push({x:p.x,y:w.y-20,angle:Math.PI},{x:p.x,y:w.y+w.h+20,angle:0});}
  const target=candidates.filter(c=>canStand(c.x,c.y,mapId,p.elevation||0,1.7)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];
  if(!target||Math.hypot(target.x-p.x,target.y-p.y)>95)return false;
  p.x=target.x;p.y=target.y;p.angle=target.angle;p.pose='arms';delete p.leftArm;delete p.rightArm;p.locked=true;p.elevation=Math.max(p.elevation||0,.22);return true;
