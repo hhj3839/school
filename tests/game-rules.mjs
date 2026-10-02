@@ -7,8 +7,8 @@ advance(r,69999);assert.equal(r.phase,'paint');advance(r,70000);assert.equal(r.p
 const late=round();advance(late,90000);assert.equal(late.phase,'seek');assert.equal(late.end,190000,'late polling does not extend the deadline');advance(late,190001);assert.equal(late.phase,'result');
 const paused=round();paused.paused=20000;advance(paused,80000);assert.equal(paused.phase,'paint');
 assert.ok(parseSettings({...DEFAULT_SETTINGS,paintSeconds:120}));assert.equal(parseSettings({...DEFAULT_SETTINGS,paintSeconds:0}),null);
-const p=makePlayer('p','이동',start);p.x=100;p.y=800;move(p,1,0,.3);assert.equal(p.x,100+SPEED*.3);p.x=240;p.y=200;move(p,1,0,.3);assert.ok(p.x<252,'fast movement cannot cross a thin wall');p.locked=true;const old=p.x;move(p,1,0,.3);assert.equal(p.x,old);p.locked=false;moveHeight(p,1,.3);assert.ok(p.elevation>.25);
-function shootRoom(){const r=round();advance(r,70000);r.players[0].x=800;r.players[0].y=800;r.players[1].x=1200;r.players[1].y=800;return r;}
+const p=makePlayer('p','이동',start);p.x=100;p.y=680;move(p,1,0,.3);assert.equal(p.x,100+SPEED*.3);p.x=240;p.y=200;move(p,1,0,.3);assert.ok(p.x<252,'fast movement cannot cross a thin wall');p.locked=true;const old=p.x;move(p,1,0,.3);assert.equal(p.x,old);p.locked=false;moveHeight(p,1,.3);assert.ok(p.elevation>.25);
+function shootRoom(){const r=round();advance(r,70000);r.players[0].x=800;r.players[0].y=650;r.players[1].x=1200;r.players[1].y=650;return r;}
 const hit=shootRoom();assert.equal(catchTarget(hit,hit.players[0],'b',71000),true,'a clear shot works beyond the old touch range');assert.equal(hit.phase,'result');
 const miss=shootRoom();assert.equal(catchTarget(miss,miss.players[0],'',71000),false);assert.equal(catchTarget(miss,miss.players[0],'b',71000+SHOT_COOLDOWN-1),false);assert.equal(catchTarget(miss,miss.players[0],'b',71000+SHOT_COOLDOWN),true);
 const far=shootRoom();far.players[1].x=1700;assert.equal(catchTarget(far,far.players[0],'b',71000),false);

@@ -2,10 +2,11 @@
 import {useEffect,useRef,useState,type MutableRefObject} from 'react';
 import {brushContains,type BrushShape} from './brush';
 import * as THREE from 'three';
-import {WALLS,OBSTACLE_HEIGHTS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
+import {applyPoseRig,poseLift,poseCenter} from './pose-rig';
+import {WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
 export type SceneInput={dx:number;dy:number;dz?:number;yaw:number};
 export type ViewMode='move'|'paint'|'look';
-export type SceneHandle={centerTarget:()=>string;shoot:()=>string;resetView:()=>void;rotateView:(delta:number)=>void;zoom:(delta:number)=>void};
+export type SceneHandle={centerTarget:()=>string;shoot:()=>string;previewView:(side:number)=>void;resetView:()=>void;rotateView:(delta:number)=>void;zoom:(delta:number)=>void};
 type Props={room:Room|null;id:string;draft:string[];mode:ViewMode;color:string;brush:number;brushShape:BrushShape;input:MutableRefObject<SceneInput>;api:MutableRefObject<SceneHandle|null>;onPaint:(p:string[])=>void;onStroke:()=>void;preview:boolean;cameraLocked:boolean;watchId?:string;reveal:boolean;picking:boolean;onPick:(color:string)=>void};
 function textureCanvas(pattern:'brick'|'wood'|'leaf'|'floor'|'blue'){
  const c=document.createElement('canvas');c.width=c.height=256;const x=c.getContext('2d')!;
@@ -25,13 +26,7 @@ function mannequin(p:Player){const group=new THREE.Group(),tex=paintTexture(p.pa
  const labelCanvas=document.createElement('canvas');labelCanvas.width=256;labelCanvas.height=64;const ctx=labelCanvas.getContext('2d')!;ctx.fillStyle='#18261be8';ctx.fillRect(0,0,256,64);ctx.fillStyle='#e1f5ae';ctx.font='bold 26px sans-serif';ctx.textAlign='center';ctx.fillText(p.name.slice(0,12),128,42);const labelTexture=new THREE.CanvasTexture(labelCanvas),label=new THREE.Sprite(new THREE.SpriteMaterial({map:labelTexture,depthTest:false}));label.scale.set(1.3,.325,1);label.position.y=1.95;group.add(label);label.visible=false;
  return {group,meshes,left,right,mat,label,labelTexture,...tex,paintKey:p.paint.join(''),paintRef:p.paint,pose:'stand' as Pose,poseKey:''};
 }
-function setPose(model:ReturnType<typeof mannequin>,pose:Pose,leftArm?:number,rightArm?:number){const key=pose+':'+leftArm+':'+rightArm;if(model.poseKey===key)return;model.poseKey=key;model.pose=pose;model.group.scale.set(1,1,1);model.group.rotation.x=0;for(const m of model.meshes){m.position.copy(m.userData.restPosition);m.rotation.z=m.userData.restRotation;}
- if(pose==='arms'){model.left.rotation.z=.9;model.right.rotation.z=-.9;model.left.position.set(-.34,1.3,0);model.right.position.set(.34,1.3,0);}
- if(pose==='slim'){model.left.position.set(-.12,1.03,.04);model.right.position.set(.12,1.03,.04);model.left.rotation.z=model.right.rotation.z=0;model.meshes[2].position.x=-.06;model.meshes[3].position.x=.06;}
- if(pose==='crouch')model.group.scale.y=.57;
- if(pose==='lie'){model.group.rotation.x=-Math.PI/2;}
- for(const [mesh,degrees,side] of [[model.left,leftArm,-1],[model.right,rightArm,1]] as const){if(degrees===undefined)continue;const rad=degrees*Math.PI/180;mesh.rotation.z=side*rad;mesh.position.set(side*(.18+.26*Math.sin(rad)),1.27-.26*Math.cos(rad),0);}
-}
+function setPose(model:ReturnType<typeof mannequin>,pose:Pose,leftArm?:number,rightArm?:number){const key=pose+':'+leftArm+':'+rightArm;if(model.poseKey===key)return;model.poseKey=key;model.pose=pose;applyPoseRig(model.group,model.meshes,pose,leftArm,rightArm);}
 export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),current=useRef(props),[failed,setFailed]=useState(false);current.current=props;
  useEffect(()=>{if(!host.current)return;const container=host.current;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{setFailed(true);return;}
  renderer.setPixelRatio(Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label','3D 미술실: 드래그로 둘러보고 캐릭터에 직접 색칠하세요');renderer.domElement.tabIndex=0;
@@ -42,7 +37,7 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  box(9,-.08,5.7,18,.16,11.4,material('floor',7.5,4.5));
  box(9,3.3,0,18,6.6,.15,material('brick',9,3.3));box(0,3.3,5.7,.15,6.6,11.4,material('wood',1,3.2));box(18,3.3,5.7,.15,6.6,11.4,material('brick',5.7,3.3));box(9,3.3,11.4,18,6.6,.15,material('wood',9,3.3));
  box(9,6.68,5.7,18,.16,11.4,material('wood',6,4));
- WALLS.forEach((w,i)=>{const h=OBSTACLE_HEIGHTS[i];box((w.x+w.w/2)/100,h/2,(w.y+w.h/2)/100,w.w/100,h,w.h/100,material(i===0?'brick':i===2?'blue':i===4||i===5?'leaf':'wood',i===0?1.4:1,Math.max(1,h/2)));});
+ WALLS.slice(0,WALLS.length-CAMO_PROPS.length).forEach((w,i)=>{const h=OBSTACLE_HEIGHTS[i];box((w.x+w.w/2)/100,h/2,(w.y+w.h/2)/100,w.w/100,h,w.h/100,material(i===0?'brick':i===2?'blue':i===4||i===5?'leaf':'wood',i===0?1.4:1,Math.max(1,h/2)));});
  // Functional camouflage backdrops mounted on the room walls.
  box(1.3,1.4,.11,1.7,2.5,.04,material('leaf',1,1.5),false);box(9,1.1,.12,1.5,2.1,.05,material('blue',1,1),false);
  // A wall bookshelf gives players several adjacent colours and lines to match.
@@ -68,8 +63,24 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  box(17.87,4.2,8.3,.12,2.6,2.8,flat('#715333'),false);
  box(17.79,4.2,8.3,.03,2.4,2.6,flat('#d8c8a3'),false);
  for(let i=0;i<8;i++)box(17.76,4.2,7.2+i*.3,.025,2.25,.14,flat(i%2?'#436966':'#dbba79'),false);
+ // Clear two-colour backdrops let beginners camouflage with freehand paint.
+ box(3.2,1.4,.13,1.8,2.5,.08,flat('#248354'),false);
+ box(3.2,1.25,.19,.34,.78,.02,flat('#f2eee2'),false);
+ box(3.2,1.93,.19,.33,.33,.02,flat('#f2eee2'),false);
+ box(2.98,.59,.19,.15,.62,.02,flat('#f2eee2'),false);box(3.42,.59,.19,.15,.62,.02,flat('#f2eee2'),false);
+ box(3.2,.26,.2,1.4,.13,.03,flat('#f2eee2'),false);
+ // Curtain stripes are flat against the far wall, leaving the walkway open.
+ const stripes=['#436966','#dbba79','#923f37','#d9d5bb'];
+ for(let i=0;i<16;i++)box(7.1+i*.24,1.55,11.25,.24,3.1,.08,flat(stripes[i%4]),false);
+ box(8.9,3.17,11.2,4.1,.1,.18,shelf,false);
+ // Solid props use exactly the same footprint and height as server collision and sight lines.
+ for(const p of CAMO_PROPS){const cx=(p.x+p.w/2)/100,cz=(p.y+p.h/2)/100,w=p.w/100,d=p.h/100;
+  if(p.kind==='plant'){box(cx,.26,cz,w,.52,d,flat('#ad6246'));box(cx,(p.height+.52)/2,cz,w,p.height-.52,d,flat('#68875d'));box(cx-w*.24,1.05,cz+d/2+.006,w*.22,.48,.01,flat('#3d5d42'),false);}
+  else if(p.kind==='crates'){box(cx,p.height/2,cz,w,p.height,d,material('wood'));for(const y of [.12,.55,1])box(cx,y,cz+d/2+.01,w,.055,.025,shelf,false);box(cx, .55,cz+d/2+.02,.07,p.height,.03,shelf,false);}
+  else {for(let i=0;i<5;i++)box(cx,(i+.5)*p.height/5,cz,w,p.height/5,d,flat(stripes[i%4]));for(let i=0;i<5;i++)box(cx,(i+.5)*p.height/5,cz+d/2+.008,w*.82,p.height/5*.58,.014,flat('#f2eee2'),false);}
+ }
  const trim=new THREE.MeshStandardMaterial({color:'#4c4a3c'});for(let z=.8;z<11.4;z+=2.2){box(.13,6.1,z,.12,.14,1.8,trim,false);box(17.87,6.1,z,.12,.14,1.8,trim,false);}box(9,6.35,5.7,.17,.18,11.4,trim,false);
- const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,startX=0,startY=0,paintDrag=false,button=0;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let targetCenter=new THREE.Vector3(5.8,1,1.1);
+ const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,startX=0,startY=0,paintDrag=false,button=0;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let wasPreview=false;let targetCenter=new THREE.Vector3(5.8,1,1.1);
  function cast(clientX:number,clientY:number){const rect=renderer.domElement.getBoundingClientRect();pointer.set((clientX-rect.left)/rect.width*2-1,-(clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);return ray.intersectObjects([...surfaces,...Array.from(models.values()).filter(m=>m.group.visible).flatMap(m=>m.meshes)],false);}
  function targetAt(x:number,y:number){const hits=cast(x,y),hit=hits[0];return hit?.object.userData.playerId||'';}
  // A lightweight toy blaster follows the first-person camera; it never blocks aiming rays.
@@ -80,7 +91,7 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:'#fff5ad',transparent:true,opacity:.9}));muzzle.position.set(0,.01,-.28);blaster.add(muzzle);muzzle.visible=false;
  const beam=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:'#ffdc72',transparent:true,opacity:.85}));scene.add(beam);beam.visible=false;let shotAt=-1000;
  function shoot(){const c=current.current,r=c.room,p=r?.players.find(p=>p.id===c.id);if(r?.phase!=='seek'||r.paused||p?.role!=='seeker'||p.caught)return '';const rect=renderer.domElement.getBoundingClientRect(),hit=cast(rect.left+rect.width/2,rect.top+rect.height/2)[0];const destination=hit&&hit.distance<=SHOT_RANGE/100?hit.point:ray.ray.at(SHOT_RANGE/100,new THREE.Vector3());const source=muzzle.getWorldPosition(new THREE.Vector3());const pos=beam.geometry.getAttribute('position');pos.setXYZ(0,source.x,source.y,source.z);pos.setXYZ(1,destination.x,destination.y,destination.z);pos.needsUpdate=true;beam.geometry.computeBoundingSphere();shotAt=performance.now();return hit&&hit.distance<=SHOT_RANGE/100?hit.object.userData.playerId||'':'';}
- props.api.current={shoot,centerTarget:()=>{const rect=renderer.domElement.getBoundingClientRect();return targetAt(rect.left+rect.width/2,rect.top+rect.height/2);},resetView:()=>{yaw=0;pitch=.16;distance=3.1;},rotateView:(delta)=>{yaw+=delta;previousPaintPoint=null;},zoom:(delta)=>{distance=Math.max(1.4,Math.min(5,distance+delta));}};
+ props.api.current={shoot,previewView:(side)=>{yaw=(current.current.room?.players.find(p=>p.id===current.current.id)?.angle||0)+side;},centerTarget:()=>{const rect=renderer.domElement.getBoundingClientRect();return targetAt(rect.left+rect.width/2,rect.top+rect.height/2);},resetView:()=>{yaw=current.current.preview?(current.current.room?.players.find(p=>p.id===current.current.id)?.angle||0):0;pitch=.16;distance=3.1;},rotateView:(delta)=>{yaw+=delta;previousPaintPoint=null;},zoom:(delta)=>{distance=Math.max(1.4,Math.min(5,distance+delta));}};
  function brushAt(x:number,y:number){
  const c=current.current,hit=cast(x,y)[0];
  if(!hit||hit.object.userData.playerId!==c.id||!hit.uv){previousPaintPoint=null;return false;}
@@ -106,10 +117,11 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  const previewBase=makePlayer('preview','나',0);
  function render(time:number){const dt=Math.min(.1,(time-last)/1000);last=time;const c=current.current,r=c.room,self=r?.players.find(p=>p.id===c.id);const previewPlayer={...previewBase,id:c.id,x:585,y:220,angle:0,pose:'arms' as Pose,paint:c.draft};const players=r?.players||[previewPlayer];
  for(const [key,m] of models)if(!players.some(p=>p.id===key)){scene.remove(m.group);m.meshes.forEach(o=>o.geometry.dispose());m.mat.dispose();m.texture.dispose();m.label.material.dispose();m.labelTexture.dispose();models.delete(key);}
- for(const p of players){let m=models.get(p.id);if(!m){m=mannequin(p);models.set(p.id,m);scene.add(m.group);}const texture=p.id===c.id&&!c.reveal&&(!r||['lobby','paint','hide','result'].includes(r.phase))?c.draft:p.paint;if(texture!==m.paintRef){const key=texture.join('');if(key!==m.paintKey){updatePaint(m.canvas,m.texture,texture);m.paintKey=key;}m.paintRef=texture;}setPose(m,p.pose||'stand',p.leftArm,p.rightArm);m.label.visible=c.reveal&&p.role==='hider'&&p.id===c.watchId;m.group.position.lerp(new THREE.Vector3(p.x/100,(p.pose==='lie'?.19:0)+(p.elevation||0),p.y/100),Math.min(1,dt*14));m.group.rotation.y=p.angle||0;m.group.visible=!!p.x&&(!p.caught||c.reveal)&&!(p.id===(c.watchId||c.id)&&p.role==='seeker'&&r?.phase==='seek'&&!c.preview);}
- const mine=(c.watchId?r?.players.find(p=>p.id===c.watchId):undefined)||self||previewPlayer;const first=mine.role==='seeker'&&r?.phase==='seek'&&!c.preview;targetCenter.lerp(new THREE.Vector3(mine.x/100,(first?1.48:mine.pose==='crouch'?.55:mine.pose==='lie'?.35:1.0)+(mine.elevation||0),mine.y/100),Math.min(1,dt*12));c.input.current.yaw=yaw;
+ for(const p of players){let m=models.get(p.id);if(!m){m=mannequin(p);models.set(p.id,m);scene.add(m.group);}const texture=p.id===c.id&&!c.reveal&&(!r||['lobby','paint','hide','result'].includes(r.phase))?c.draft:p.paint;if(texture!==m.paintRef){const key=texture.join('');if(key!==m.paintKey){updatePaint(m.canvas,m.texture,texture);m.paintKey=key;}m.paintRef=texture;}setPose(m,p.pose||'stand',p.leftArm,p.rightArm);m.label.visible=c.reveal&&p.role==='hider'&&p.id===c.watchId;m.group.position.lerp(new THREE.Vector3(p.x/100,poseLift(p.pose)+(p.elevation||0),p.y/100),Math.min(1,dt*14));m.group.rotation.y=p.angle||0;m.group.visible=!!p.x&&(!p.caught||c.reveal)&&!(p.id===(c.watchId||c.id)&&p.role==='seeker'&&r?.phase==='seek'&&!c.preview);}
+ const mine=(c.watchId?r?.players.find(p=>p.id===c.watchId):undefined)||self||previewPlayer;if(c.preview&&!wasPreview)yaw=mine.angle||0;wasPreview=c.preview;const first=mine.role==='seeker'&&r?.phase==='seek'&&!c.preview;targetCenter.lerp(new THREE.Vector3(mine.x/100,(first?1.48:poseCenter(mine.pose))+(mine.elevation||0),mine.y/100),Math.min(1,dt*12));c.input.current.yaw=yaw;
  if(first){camera.position.copy(targetCenter);camera.lookAt(targetCenter.clone().add(new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch),-Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch))));}
- else{const aim=targetCenter.clone(),viewPitch=c.preview?.03:pitch,viewDistance=c.preview?5.2:distance,dir=new THREE.Vector3(Math.sin(yaw)*Math.cos(viewPitch),Math.sin(viewPitch),Math.cos(yaw)*Math.cos(viewPitch));ray.set(aim,dir);const obstruction=ray.intersectObjects(blockers,false).find(h=>h.distance>.08);const dist=obstruction?Math.min(viewDistance,Math.max(.25,obstruction.distance-.15)):viewDistance;camera.position.copy(aim).addScaledVector(dir,dist);camera.lookAt(aim);}
+ else if(c.preview){const eye=new THREE.Vector3(mine.x/100,1.48,mine.y/100),dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));ray.set(eye,dir);const obstruction=ray.intersectObjects(blockers,false).find(h=>h.distance>.08);const dist=obstruction?Math.min(4,Math.max(.3,obstruction.distance-.2)):4;camera.position.copy(eye).addScaledVector(dir,dist);camera.lookAt(targetCenter);}
+ else{const aim=targetCenter.clone(),viewPitch=pitch,viewDistance=distance,dir=new THREE.Vector3(Math.sin(yaw)*Math.cos(viewPitch),Math.sin(viewPitch),Math.cos(yaw)*Math.cos(viewPitch));ray.set(aim,dir);const obstruction=ray.intersectObjects(blockers,false).find(h=>h.distance>.08);const dist=obstruction?Math.min(viewDistance,Math.max(.25,obstruction.distance-.15)):viewDistance;camera.position.copy(aim).addScaledVector(dir,dist);camera.lookAt(aim);}
  blaster.visible=first&&!c.reveal&&!r?.paused;const firing=time-shotAt<130;muzzle.visible=firing;beam.visible=firing&&blaster.visible;blaster.position.z=-.43+(firing?.045:0);renderer.render(scene,camera);frame=requestAnimationFrame(render);}
  frame=requestAnimationFrame(render);return()=>{cancelAnimationFrame(frame);resize.disconnect();props.api.current=null;models.forEach(m=>{m.mat.dispose();m.texture.dispose();m.label.material.dispose();m.labelTexture.dispose();});scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();if(!Array.isArray(o.material))o.material.dispose();}});beam.geometry.dispose();beam.material.dispose();textures.forEach(t=>t.dispose());renderer.dispose();canvas.remove();};
  },[]);
