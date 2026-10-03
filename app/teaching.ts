@@ -7,6 +7,6 @@ export function recommendedRules(count:number,mapId:RoomSettings['mapId']){
 export function teacherRoomSummary(room:Room,now:number){
  advance(room,now);
  const players=room.players.map(p=>({id:p.id,name:p.name,role:p.role,online:now-p.last<15000,ready:!!p.locked,caught:p.caught}));
- return {code:room.code,mapName:mapName(roomSettings(room).mapId),phase:room.phase,paused:!!room.paused,remaining:room.end?Math.max(0,Math.ceil((room.end-(room.paused||now))/1000)):0,players,online:players.filter(p=>p.online).length,ready:players.filter(p=>p.role==='hider'&&p.ready).length,hiders:players.filter(p=>p.role==='hider').length};
+ return {settings:roomSettings(room),code:room.code,mapName:mapName(roomSettings(room).mapId),phase:room.phase,paused:!!room.paused,remaining:room.end?Math.max(0,Math.ceil((room.end-(room.paused||now))/1000)):0,players,online:players.filter(p=>p.online).length,ready:players.filter(p=>p.role==='hider'&&p.ready).length,hiders:players.filter(p=>p.role==='hider').length};
 }
 export type TeacherRoom=ReturnType<typeof teacherRoomSummary>;
