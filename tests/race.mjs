@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {registerHooks} from 'node:module';
+import {readFileSync} from 'node:fs';
+const sql=new DatabaseSync(':memory:');
+for(const file of ['0000_high_roulette.sql','0001_marvelous_psynapse.sql','0002_majestic_captain_universe.sql','0003_moaning_dakota_north.sql','0004_lovely_captain_universe.sql'])sql.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
+sql.exec('UPDATE classroom SET student_create=1');
+globalThis.__testEnv={TEACHER_KEY:'test-only-secret',DB:{
+ prepare(query){let values=[];return {bind(...args){values=args;return this;},async first(){return sql.prepare(query).get(...values)||null;},async all(){return {results:sql.prepare(query).all(...values)};},async run(){return {meta:sql.prepare(query).run(...values)};}};},
+ async batch(statements){sql.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}}
+}};
+registerHooks({resolve(s,c,next){if(s==='cloudflare:workers')return {url:'test:cloudflare',shortCircuit:true};try{return next(s,c)}catch(e){if(s.startsWith('.'))return next(s+'.ts',c);throw e;}},load(url,c,next){if(url==='test:cloudflare')return {format:'module',source:'export const env=globalThis.__testEnv;',shortCircuit:true};return next(url,c);}});
+const classroom=await import('../app/api/classroom/route.ts'),room=await import('../app/api/race/route.ts');
+async function call(handler,path,body,key,origin='http://localhost'){const response=await handler(new Request('http://localhost/api/'+path,{method:'POST',headers:{'Content-Type':'application/json',Origin:origin,...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify(body)}));return {status:response.status,...await response.json()};}
+const control=(action,key='test-only-secret',origin)=>call(classroom.POST,'classroom',{action},key,origin);
+const play=(action,data={})=>call(room.POST,'room',{action,...data});
+
+
+
+const engine=await import('../app/race/engine.ts');
+let clock=2000000000000;Date.now=()=>clock;
+const made=await play('create',{name:'방장'});assert.equal(made.status,200);
+const sessions=[{code:made.room.code,token:made.token}];
+for(let i=1;i<8;i++){const d=await play('join',{code:made.room.code,name:'친구'+i});assert.equal(d.status,200);sessions.push({code:made.room.code,token:d.token});}
+assert.equal((await play('join',{code:made.room.code,name:'아홉째'})).status,409);
+assert.equal((await play('start',sessions[1])).status,403);
+assert.equal((await play('state',{code:made.room.code,token:'wrong'})).status,401);
+let d=await play('start',sessions[0]);assert.equal(d.room.phase,'playing');assert.ok(d.room.players.every(p=>!p.token));
+const hide=await import('../app/api/room/route.ts'),blocks=await import('../app/api/blocks/route.ts');
+assert.equal((await call(hide.POST,'room',{action:'state',...sessions[0]})).status,409);
+assert.equal((await call(blocks.POST,'blocks',{action:'state',...sessions[0]})).status,409);
+clock+=3400;const commands=Array.from({length:8},(_,i)=>({seq:i+1,x:0,z:1,jump:false}));
+d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.players[0].seq,8);const z=d.room.players[0].z;assert.ok(z>2&&z<=5.61);
+d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.players[0].z,z,'retries cannot replay movement');
+d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].seq,8,'server time limits movement');
+assert.equal((await play('input',{...sessions[0],commands:[{seq:9,x:99,z:1,jump:false}]})).status,400);
+const manage=action=>call(classroom.POST,'classroom',{action,code:made.room.code},'test-only-secret');
+assert.equal((await manage('pauseRoom')).status,200);const end=d.room.end;clock+=10000;
+d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].z,z);
+assert.equal((await manage('resumeRoom')).status,200);d=await play('state',sessions[0]);assert.equal(d.room.end,end+10000);
+const summary=await control('status');assert.equal(summary.rooms[0].kind,'race');assert.equal(summary.rooms[0].online,8);
+assert.equal((await manage('endRoom')).status,200);d=await play('start',sessions[0]);assert.equal(d.room.round,2);assert.equal(d.room.players[0].seq,0);
+assert.equal((await manage('deleteRoom')).status,200);assert.equal((await play('state',sessions[1])).status,404);
+await control('close');assert.equal((await play('create',{name:'닫힘'})).status,423);await control('open');
+// Full course simulation, using the same movement and hazards as client/server.
+const r=engine.practiceRace('완주 연습',clock),p=r.players[0];let at=r.start;
+for(let i=0;i<3600&&!p.finished;i++){
+ at+=50;p.last=at;let target=0;
+ for(const w of engine.WALLS)if(p.z>w.z-7&&p.z<w.z+3)target=w.x<0?4:-4;
+ if(p.z>104&&p.z<119)target=engine.platformX(engine.raceTime(r,at));
+ let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a)||engine.SPINNERS.some(z=>Math.abs(z-p.z)<6);
+ const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
+}
+assert.ok(p.finished,'course is traversable within three minutes');assert.equal(r.phase,'result');
+const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=2;q.x=10;q.z=102;q.y=-4.9;q.vy=-5;engine.stepRacer(f,q,{seq:1,x:0,z:0,jump:false},f.start+50);assert.equal(q.z,96);assert.equal(q.falls,1);
+const multi=engine.makeRace('TESTAA',engine.makeRacer('a','a',clock));multi.players.push(engine.makeRacer('b','b',clock));engine.startRace(multi,clock);multi.players[0].finished=5000;engine.advanceRace(multi,multi.start+6000);assert.equal(multi.phase,'playing','one finisher does not stop other runners');multi.players.forEach(p=>p.last=multi.end);engine.advanceRace(multi,multi.end);assert.equal(multi.phase,'result');
+console.log('PASS: 8 players, capacity/auth/isolation, input limits/dedupe, teacher pause/end/delete/all-stop, restart, complete course, checkpoint recovery and remaining runners');

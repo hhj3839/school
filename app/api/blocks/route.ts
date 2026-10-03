@@ -28,7 +28,7 @@ export async function POST(req:Request){try{
  if(a.action==='input'&&(!Array.isArray(a.commands)||a.commands.length>12||a.commands.some((c:{seq:number;key:string})=>!c||!Number.isSafeInteger(c.seq)||c.seq<1||!['left','right','rotate','down','drop'].includes(c.key))))return reply({error:'조작 정보를 다시 확인해 주세요.'},400);
  for(let attempt=0;attempt<12;attempt++){
   const row=await db.prepare('SELECT state,version,expires FROM rooms WHERE code=? AND expires>?').bind(code,now).first<{state:string;version:number;expires:number}>();if(!row)return reply({error:'방이 끝났어요. 새 방에 들어가 주세요.'},404);
-  const r=JSON.parse(row.state);if(!isBlocks(r))return reply({error:'숨바꼭질 방이에요. 숨바꼭질 화면에서 들어가 주세요.'},409);
+  const r=JSON.parse(row.state);if(!isBlocks(r))return reply({error:'다른 게임의 방이에요. 게임을 다시 골라 주세요.'},409);
   const before=JSON.stringify(r);r.players=r.players.filter(p=>now-p.last<ROOM_IDLE_MS);
   if(!r.players.length){await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();return reply({error:'모두 나가서 방이 정리됐어요.'},404);}
   if(!r.players.some(p=>p.id===r.host))r.host=r.players[0].id;

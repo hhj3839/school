@@ -1,3 +1,4 @@
+import {isRace,advanceRace,finishRace,pauseRace,type RaceRoom} from '../../race/engine';
 import {isBlocks,advanceBlocks,finishBlocks,pauseBlocks,type BlockRoom} from '../../blocks/engine';
 import {MAX_ROOMS,ROOM_IDLE_MS,cleanIdleRooms} from '../../room-limits';
 import {authorizedTeacher} from '../../teacher-auth';
@@ -7,7 +8,7 @@ import {advance,mapName,roomSettings,type Room} from '../../game';
 import { classroomState } from '../../classroom';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room|BlockRoom;if(isBlocks(r))advanceBlocks(r,Date.now());else advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,kind:isBlocks(r)?'blocks':'hideout',mapName:isBlocks(r)?'블록 대결':mapName(roomSettings(r).mapId),count,capacity:isBlocks(r)?4:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<(isBlocks(r)?4:roomSettings(r).maxPlayers)};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
+export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(r))advanceRace(r,Date.now());else if(isBlocks(r))advanceBlocks(r,Date.now());else advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,kind:isRace(r)?'race':isBlocks(r)?'blocks':'hideout',mapName:isRace(r)?'우당탕 운동회':isBlocks(r)?'블록 대결':mapName(roomSettings(r).mapId),count,capacity:isRace(r)?8:isBlocks(r)?4:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<(isRace(r)?8:isBlocks(r)?4:roomSettings(r).maxPlayers)};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
 export async function POST(req:Request){try{
   if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'허용되지 않은 요청이에요.'},403);
   if(!await authorizedTeacher(req))return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
@@ -24,7 +25,7 @@ export async function POST(req:Request){try{
   if(action==='check')return reply(await classroomState());
   if(action==='status'){
     const now=Date.now(),db=database();await cleanIdleRooms(now);const rows=await db.prepare('SELECT state FROM rooms WHERE expires>? ORDER BY version DESC').bind(now).all<{state:string}>();
-    const rooms=rows.results.map(row=>JSON.parse(row.state) as Room|BlockRoom).filter(r=>r.players.some(p=>now-p.last<120000)).map(r=>teacherRoomSummary(r,now));
+    const rooms=rows.results.map(row=>JSON.parse(row.state) as Room|BlockRoom|RaceRoom).filter(r=>r.players.some(p=>now-p.last<120000)).map(r=>teacherRoomSummary(r,now));
     const featured=await db.prepare('SELECT featured_code FROM classroom WHERE id=1').first<{featured_code:string|null}>();return reply({featuredCode:featured?.featured_code,rooms,updatedAt:now,limits:{maxRooms:MAX_ROOMS,idleSeconds:ROOM_IDLE_MS/1000},totals:{rooms:rooms.length,playing:rooms.filter(r=>!['lobby','result'].includes(r.phase)).length,online:rooms.reduce((n,r)=>n+r.online,0)}});
   }
   if(action==='featureRoom'||action==='unfeatureRoom'){
@@ -38,9 +39,10 @@ export async function POST(req:Request){try{
     for(let i=0;i<8;i++){
       const row=await db.prepare('SELECT state,version FROM rooms WHERE code=? AND expires>?').bind(code,now).first<{state:string;version:number}>();
       if(!row)return reply({error:'종료되었거나 없는 방이에요.'},404);
-      const room=JSON.parse(row.state) as Room|BlockRoom;if(isBlocks(room))advanceBlocks(room,now);else advance(room,now);
+      const room=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(room))advanceRace(room,now);else if(isBlocks(room))advanceBlocks(room,now);else advance(room,now);
       if(['lobby','result'].includes(room.phase))return reply({error:'진행 중인 판에서 사용할 수 있어요.'},409);
-      if(isBlocks(room)){if(action==='endRoom')finishBlocks(room,'선생님이 이번 판을 마쳤어요');else pauseBlocks(room,now,action==='pauseRoom');}
+      if(isRace(room)){if(action==='endRoom')finishRace(room,'선생님이 이번 판을 마쳤어요');else pauseRace(room,now,action==='pauseRoom');}
+      else if(isBlocks(room)){if(action==='endRoom')finishBlocks(room,'선생님이 이번 판을 마쳤어요');else pauseBlocks(room,now,action==='pauseRoom');}
       else if(action==='endRoom'){room.phase='result';room.end=0;room.paused=0;room.winner='선생님이 이번 판을 마쳤어요';}
       else if(action==='pauseRoom'&&!room.paused)room.paused=now;
       else if(action==='resumeRoom'&&room.paused){room.end+=now-room.paused;room.players.forEach(p=>{p.moveAt=now;if(p.reloadUntil)p.reloadUntil+=now-room.paused;});room.paused=0;}
