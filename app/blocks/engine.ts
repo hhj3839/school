@@ -1,5 +1,5 @@
 export const COLS=10,ROWS=20,DURATION=180000;
-export const COLORS=['#172331','#57d8e5','#8f95ff','#ffa15a','#f4d86c','#7ddd9c','#cb91f4','#ff7e98','#748494'];
+export const COLORS=['#f5f9fb','#59bfd4','#8795df','#efab6b','#edc86a','#76bc93','#b497d7','#eb91a5','#8f9eab'];
 export const SHAPES=[[[0,1],[1,1],[2,1],[3,1]],[[0,0],[0,1],[1,1],[2,1]],[[2,0],[0,1],[1,1],[2,1]],[[1,0],[2,0],[1,1],[2,1]],[[1,0],[2,0],[0,1],[1,1]],[[1,0],[0,1],[1,1],[2,1]],[[0,0],[1,0],[1,1],[2,1]]];
 export type Command='left'|'right'|'rotate'|'down'|'drop';
 export type Piece={kind:number;rotation:number;x:number;y:number};
