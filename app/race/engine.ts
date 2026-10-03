@@ -1,20 +1,28 @@
-export const FINISH=160,STEP=50,DURATION=180000;
+export const FINISH=160,STEP=50,DURATION=180000,CAPACITY=20;
 export const GAPS=[[42,47],[87,92],[109,117]];
 export const START=2;
 export const WALL_HEIGHT=5;
-export const SPINNERS=[26,58,72,133];
-export const MOVERS=[36,83,104,139];
+export const SPINNERS=[20,68,133];
+export const MOVERS=[52,99];
 export const moverX=(time:number,z:number)=>Math.sin(time*1.2+z)*4;
 export const spinnerAngle=(time:number,z:number)=>time*2.1+z;
-export const WALLS=[12,20,32,52,64,78,99,125,144,153].map((z,i)=>({x:i%2?2:-2,z,w:10}));
+export const WALLS=[{x:-4,z:12,w:5},{x:3,z:153,w:6}];
+export const GATES=[38,126];
+export const PENDULUMS=[28,82,141];
+export const BELTS=[{z:58,d:7,dir:1},{z:74,d:6,dir:-1},{z:146,d:6,dir:1}];
+export const BOUNCERS=[61,120];
+export const gateAngle=(time:number,z:number)=>time*.85+z;
+export function pendulum(time:number,z:number){const x=Math.sin(time*1.65+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
+export function courseHint(z:number){if(z<16)return '높은 벽은 옆으로 피해요';if(z<24)return '회전 막대는 점프!';if(z<34)return '흔들리는 공을 보고 빈틈으로!';if(z<42)return '회전문이 열릴 때 통과해요';if(z<48)return '분홍색 끝에서 점프!';if(z<65)return '화살표 바닥이 옆으로 밀어요';if(z<87)return '막대와 공을 조심해요';if(z<94)return '바다 틈을 점프로 건너요';if(z<106)return '움직이는 벽의 빈틈을 찾아요';if(z<118)return '움직이는 발판을 따라가요';if(z<132)return '점프 발판 다음은 회전문!';if(z<150)return '마지막 공과 밀리는 바닥을 조심!';return '분홍색 문을 먼저 통과하면 우승!';}
+
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
 export type Racer={id:string;token?:string;name:string;last:number;x:number;z:number;y:number;vy:number;at:number;seq:number;checkpoint:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
-export type RaceRoom={kind:'race';practice?:boolean;code:string;host:string;players:Racer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;winner:string};
+export type RaceRoom={kind:'race';practice?:boolean;code:string;host:string;players:Racer[];finishers?:Racer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;winner:string};
 export const isRace=(v:unknown):v is RaceRoom=>!!v&&typeof v==='object'&&'kind' in v&&v.kind==='race';
-export function makeRacer(id:string,name:string,now:number,color=0):Racer{return {id,name,last:now,x:(color%4-1.5)*2,z:2-Math.floor(color/4)*1.5,y:0,vy:0,at:now,seq:0,checkpoint:0,falls:0,finished:0,stun:0,bounce:0,peak:0,color};}
+export function makeRacer(id:string,name:string,now:number,color=0):Racer{return {id,name,last:now,x:0,z:START,y:0,vy:0,at:now,seq:0,checkpoint:0,falls:0,finished:0,stun:0,bounce:0,peak:0,color};}
 export function makeRace(code:string,p:Racer):RaceRoom{return {kind:'race',code,host:p.id,players:[p],phase:'lobby',round:0,start:0,end:0,paused:0,winner:''};}
-export function startRace(r:RaceRoom,now:number){r.round++;r.phase='playing';r.start=now+3000;r.end=r.start+DURATION;r.paused=0;r.winner='';r.players=r.players.map((p,i)=>({...makeRacer(p.id,p.name,r.start,i),token:p.token,last:now}));}
+export function startRace(r:RaceRoom,now:number){r.round++;r.finishers=[];r.phase='playing';r.start=now+3000;r.end=r.start+DURATION;r.paused=0;r.winner='';r.players=r.players.map((p,i)=>({...makeRacer(p.id,p.name,r.start,i),token:p.token,last:now,x:(i-(r.players.length-1)/2)*Math.min(2.1,11.6/Math.max(1,r.players.length-1))}));}
 export function raceTime(r:RaceRoom,now:number){return Math.max(0,((r.paused||now)-r.start)/1000);}
 export function platformX(time:number){return Math.sin(time*.8)*3.5;}
 export function ground(x:number,z:number,time:number){if(Math.abs(x)>7||z< -3||z>168)return false;for(const [a,b] of GAPS)if(z>a&&z<b)return a===109&&Math.abs(x-platformX(time))<2.8;return true;}
@@ -23,6 +31,7 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  const dt=STEP/1000,t=raceTime(r,at),norm=Math.max(1,Math.hypot(c.x,c.z)),ox=p.x,oz=p.z;
  if(at>=p.stun){p.x+=c.x/norm*9*dt;p.z+=c.z/norm*9*dt;}else p.z-=2*dt;
  p.z=Math.max(-2,p.z);
+ if(p.y===0&&at>=p.stun)for(const b of BELTS)if(Math.abs(p.z-b.z)<b.d/2)p.x+=b.dir*3.2*dt;
  if(c.jump&&p.y===0&&ground(ox,oz,t))p.vy=9;
  p.vy-=18*dt;p.y+=p.vy*dt;
  if(p.y<=0&&p.vy<=0&&ground(p.x,p.z,t)){p.y=0;p.vy=0;}
@@ -36,14 +45,17 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
    else{p.x=ox;p.z=oz<=w.z?w.z-1.06:w.z+1.06;}
   }
  }
+ for(const z of GATES){const a=gateAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<5.9&&Math.abs(across)<.7&&p.y<WALL_HEIGHT){p.x=ox;p.z=oz<=z?Math.min(oz,z-1.1):Math.max(oz,z+1.1);}}
+ for(const z of PENDULUMS){const ball=pendulum(t,z);if(Math.hypot(p.x-ball.x,p.z-z)<1.7&&Math.abs(p.y+.9-ball.y)<2&&at>=p.stun){p.x+=(p.x>=ball.x?1:-1)*1.7;p.z-=1.2;p.vy=4;p.stun=at+650;}}
  for(const z of SPINNERS){const a=spinnerAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<6&&Math.abs(across)<.7&&p.y<1.05&&at>=p.stun){p.stun=at+600;p.z-=1.8;p.vy=3;}}
- if((Math.abs(p.z-56)<1.4||Math.abs(p.z-124)<1.4)&&Math.abs(p.x)<2.4&&p.y===0&&at>p.bounce){p.vy=12;p.bounce=at+1400;}
+ if(BOUNCERS.some(z=>Math.abs(p.z-z)<1.4)&&Math.abs(p.x)<2.4&&p.y===0&&at>p.bounce){p.vy=12;p.bounce=at+1400;}
  if(p.y< -5){p.x=0;p.z=START;p.y=0;p.vy=0;p.checkpoint=0;p.falls++;p.stun=at+200;p.bounce=0;}
  if(p.y>=0&&ground(p.x,p.z,t)){p.peak=Math.max(p.peak,Math.min(FINISH,p.z));}
- if(p.z>=FINISH&&p.y>=0&&Math.abs(p.x)<7)p.finished=at-r.start;
+ if(p.z>=FINISH&&p.y>=0&&Math.abs(p.x)<7){p.finished=at-r.start;const {token,...result}=p;r.finishers||=[];r.finishers.push({...result});}
 }
-export function raceRanks(r:RaceRoom){return [...r.players].sort((a,b)=>a.finished&&b.finished?a.finished-b.finished:a.finished?-1:b.finished?1:b.peak-a.peak);}
-export function finishRace(r:RaceRoom,message=''){r.phase='result';r.paused=0;r.winner=message||'모두 수고했어요!';}
+export function raceRanks(r:RaceRoom){return [...new Map([...r.players,...(r.finishers||[])].map(p=>[p.id,p])).values()].sort((a,b)=>a.finished&&b.finished?a.finished-b.finished:a.finished?-1:b.finished?1:b.peak-a.peak);}
+export function raceWinners(r:RaceRoom){const done=raceRanks(r).filter(p=>p.finished);return done.length?done.filter(p=>p.finished===done[0].finished):[];}
+export function finishRace(r:RaceRoom,message=''){r.phase='result';r.paused=0;const winners=raceWinners(r);r.winner=message||(r.practice?(winners.length?'완주 성공!':'다시 도전해 봐요!'):winners.length?winners.map(p=>p.name).join(' · ')+(winners.length>1?' 공동 우승!':' 우승!'):'시간 종료 · 이번 판은 완주자가 없어요');}
 export function advanceRace(r:RaceRoom,now:number){if(r.phase!=='playing'||r.paused)return;if(now>=r.end||r.players.every(p=>p.finished||now-p.last>30000))finishRace(r);}
 export function pauseRace(r:RaceRoom,now:number,on:boolean){if(r.phase!=='playing')return;if(on&&!r.paused)r.paused=now;else if(!on&&r.paused){const d=now-r.paused;r.start+=d;r.end+=d;r.players.forEach(p=>{p.at=now;p.stun+=d;p.bounce+=d;p.last=now;});r.paused=0;}}
 export function publicRace(r:RaceRoom){return {...r,players:r.players.map(({token,...p})=>p)};}

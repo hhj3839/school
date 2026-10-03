@@ -1,7 +1,7 @@
 import {database} from '../../../db/raw';
 import {classroomState} from '../../classroom';
 import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-limits';
-import {isRace,makeRace,makeRacer,startRace,advanceRace,stepRacer,publicRace,pauseRace,finishRace,STEP,type RaceInput} from '../../race/engine';
+import {isRace,makeRace,makeRacer,startRace,advanceRace,stepRacer,publicRace,pauseRace,finishRace,STEP,CAPACITY,type RaceInput} from '../../race/engine';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 export async function POST(req:Request){try{
@@ -28,7 +28,7 @@ export async function POST(req:Request){try{
   if(!r.players.length){await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();return reply({error:'모두 나가서 방이 정리됐어요.'},404);}
   if(!r.players.some(p=>p.id===r.host))r.host=r.players[0].id;
   advanceRace(r,now);let p=r.players.find(p=>p.token===a.token),token:string|undefined;
-  if(a.action==='join'&&!p){if(r.phase==='playing')return reply({error:'경기 중이에요. 이번 판이 끝나면 들어올 수 있어요.'},409);if(r.players.length>=8)return reply({error:'8명이 모두 모였어요.'},409);p=makeRacer(crypto.randomUUID(),name,now,r.players.length);token=crypto.randomUUID();p.token=token;r.players.push(p);}
+  if(a.action==='join'&&!p){if(r.phase==='playing')return reply({error:'경기 중이에요. 이번 판이 끝나면 들어올 수 있어요.'},409);if(r.players.length>=CAPACITY)return reply({error:'20명이 모두 모였어요.'},409);p=makeRacer(crypto.randomUUID(),name,now,r.players.length);token=crypto.randomUUID();p.token=token;r.players.push(p);}
   if(!p)return reply({error:'방 코드로 다시 들어가 주세요.'},401);
   if(a.action==='input'){
    if(a.round!==r.round)return reply({room:publicRace(r),id:p.id,serverTime:now});

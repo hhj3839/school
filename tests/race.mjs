@@ -21,11 +21,11 @@ const engine=await import('../app/race/engine.ts');
 let clock=2000000000000;Date.now=()=>clock;
 const made=await play('create',{name:'방장'});assert.equal(made.status,200);
 const sessions=[{code:made.room.code,token:made.token}];
-for(let i=1;i<8;i++){const d=await play('join',{code:made.room.code,name:'친구'+i});assert.equal(d.status,200);sessions.push({code:made.room.code,token:d.token});}
-assert.equal((await play('join',{code:made.room.code,name:'아홉째'})).status,409);
+for(let i=1;i<20;i++){const d=await play('join',{code:made.room.code,name:'친구'+i});assert.equal(d.status,200);sessions.push({code:made.room.code,token:d.token});}
+assert.equal((await play('join',{code:made.room.code,name:'스물한째'})).status,409);
 assert.equal((await play('start',sessions[1])).status,403);
 assert.equal((await play('state',{code:made.room.code,token:'wrong'})).status,401);
-let d=await play('start',sessions[0]);assert.equal(d.room.phase,'playing');assert.ok(d.room.players.every(p=>!p.token));
+let d=await play('start',sessions[0]);assert.equal(d.room.phase,'playing');assert.ok(d.room.players.every(p=>!p.token));assert.equal(d.room.players.length,20);assert.ok(d.room.players.every(p=>p.z===engine.START&&engine.ground(p.x,p.z,0)),'equal start line for all 20');
 const hide=await import('../app/api/room/route.ts'),blocks=await import('../app/api/blocks/route.ts');
 assert.equal((await call(hide.POST,'room',{action:'state',...sessions[0]})).status,409);
 assert.equal((await call(blocks.POST,'blocks',{action:'state',...sessions[0]})).status,409);
@@ -38,7 +38,7 @@ const manage=action=>call(classroom.POST,'classroom',{action,code:made.room.code
 assert.equal((await manage('pauseRoom')).status,200);const end=d.room.end;clock+=10000;
 d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].z,z);
 assert.equal((await manage('resumeRoom')).status,200);d=await play('state',sessions[0]);assert.equal(d.room.end,end+10000);
-const summary=await control('status');assert.equal(summary.rooms[0].kind,'race');assert.equal(summary.rooms[0].online,8);
+const summary=await control('status');assert.equal(summary.rooms[0].kind,'race');assert.equal(summary.rooms[0].online,20);
 assert.equal((await manage('endRoom')).status,200);d=await play('start',sessions[0]);assert.equal(d.room.round,2);assert.equal(d.room.players[0].seq,0);
 assert.equal((await manage('deleteRoom')).status,200);assert.equal((await play('state',sessions[1])).status,404);
 await control('close');assert.equal((await play('create',{name:'닫힘'})).status,423);await control('open');
@@ -48,6 +48,7 @@ for(let i=0;i<3600&&!p.finished;i++){
  at+=50;p.last=at;let target=0;
  const nextWall=[...engine.WALLS,...engine.MOVERS.map(z=>({x:engine.moverX(engine.raceTime(r,at),z),z,w:5}))].filter(w=>w.z>p.z-1.1).sort((a,b)=>a.z-b.z)[0];
  if(nextWall&&nextWall.z-p.z<8)target=nextWall.x<0?5:-5;
+ for(const z of engine.GATES)if(p.z>z-7&&p.z<z+5)target=5;
  if(p.z>104&&p.z<119)target=engine.platformX(engine.raceTime(r,at));
  let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a)||engine.SPINNERS.some(z=>Math.abs(z-p.z)<6);
  const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
@@ -57,5 +58,10 @@ const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=2;q.x=10
 // Neither normal jumps nor bounce-pad height can clear a tall wall.
 for(const vy of [9,12]){const wall=engine.WALLS[0],r=engine.practiceRace('벽 점프',clock),p=r.players[0];p.x=wall.x;p.z=wall.z-2;p.vy=vy;let maxY=0;for(let i=1;i<=30;i++){engine.stepRacer(r,p,{seq:i,x:0,z:1,jump:true},r.start+i*50);maxY=Math.max(maxY,p.y);assert.ok(p.z<wall.z-1,'wall cannot be jumped through');}assert.ok(maxY<engine.WALL_HEIGHT);}
 const moving=engine.practiceRace('움직이는 벽',clock),runner=moving.players[0],mz=engine.MOVERS[0];runner.x=engine.moverX(.05,mz);runner.z=mz-1.2;runner.y=2;engine.stepRacer(moving,runner,{seq:1,x:0,z:1,jump:false},moving.start+50);assert.ok(runner.z<mz-1,'moving wall collision uses rendered position');
-const multi=engine.makeRace('TESTAA',engine.makeRacer('a','a',clock));multi.players.push(engine.makeRacer('b','b',clock));engine.startRace(multi,clock);multi.players[0].finished=5000;engine.advanceRace(multi,multi.start+6000);assert.equal(multi.phase,'playing','one finisher does not stop other runners');multi.players.forEach(p=>p.last=multi.end);engine.advanceRace(multi,multi.end);assert.equal(multi.phase,'result');
-console.log('PASS: 8 players, capacity/auth/isolation, input limits/dedupe, teacher pause/end/delete/all-stop, restart, complete course, start-line recovery and remaining runners');
+const belt=engine.practiceRace('바닥',clock),bp=belt.players[0];bp.z=engine.BELTS[0].z;engine.stepRacer(belt,bp,{seq:1,x:0,z:0,jump:false},belt.start+50);assert.ok(bp.x>0,'conveyor pushes sideways');
+const pend=engine.practiceRace('공',clock),pp=pend.players[0],pz=engine.PENDULUMS[0],ball=engine.pendulum(.05,pz);pp.x=ball.x;pp.z=pz;engine.stepRacer(pend,pp,{seq:1,x:0,z:0,jump:false},pend.start+50);assert.ok(pp.stun>pend.start+50,'swinging ball knocks player');
+const gate=engine.practiceRace('회전문',clock),gp=gate.players[0];gp.z=engine.GATES[0]-.2;gp.y=2;engine.stepRacer(gate,gp,{seq:1,x:0,z:1,jump:false},gate.start+50);assert.ok(gp.z<engine.GATES[0],'rotating gate blocks center');
+const multi=engine.makeRace('TESTAA',engine.makeRacer('a','a',clock));multi.players.push(engine.makeRacer('b','b',clock));engine.startRace(multi,clock);multi.players[0].finished=5000;engine.advanceRace(multi,multi.start+6000);assert.equal(multi.phase,'playing','one finisher does not stop other runners');multi.players.forEach(p=>p.last=multi.end);engine.advanceRace(multi,multi.end);assert.equal(multi.phase,'result');assert.equal(multi.winner,'a 우승!');
+const podium=engine.makeRace('TESTBB',engine.makeRacer('first','먼저',clock));podium.players.push(engine.makeRacer('second','나중',clock));engine.startRace(podium,clock);for(const [i,ms]of [[0,7000],[1,8000]]){podium.players[i].z=engine.FINISH-.1;engine.stepRacer(podium,podium.players[i],{seq:1,x:0,z:1,jump:false},podium.start+ms);}assert.equal(engine.raceWinners(podium)[0].id,'first');assert.ok(podium.finishers.every(p=>!p.token));podium.players.shift();engine.finishRace(podium);assert.equal(podium.winner,'먼저 우승!','winner retained after leaving');
+const tie=engine.makeRace('TESTCC',engine.makeRacer('a','가',clock));tie.players.push(engine.makeRacer('b','나',clock));engine.startRace(tie,clock);tie.players.forEach(p=>p.finished=1000);engine.finishRace(tie);assert.equal(tie.winner,'가 · 나 공동 우승!');
+console.log('PASS: 20 players, capacity/auth/isolation, input limits/dedupe, teacher pause/end/delete/all-stop, restart, complete course, start-line recovery and remaining runners');

@@ -1,4 +1,4 @@
-import {isRace,advanceRace,finishRace,pauseRace,type RaceRoom} from '../../race/engine';
+import {isRace,advanceRace,finishRace,pauseRace,CAPACITY,type RaceRoom} from '../../race/engine';
 import {isBlocks,advanceBlocks,finishBlocks,pauseBlocks,type BlockRoom} from '../../blocks/engine';
 import {MAX_ROOMS,ROOM_IDLE_MS,cleanIdleRooms} from '../../room-limits';
 import {authorizedTeacher} from '../../teacher-auth';
@@ -8,7 +8,7 @@ import {advance,mapName,roomSettings,type Room} from '../../game';
 import { classroomState } from '../../classroom';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(r))advanceRace(r,Date.now());else if(isBlocks(r))advanceBlocks(r,Date.now());else advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,kind:isRace(r)?'race':isBlocks(r)?'blocks':'hideout',mapName:isRace(r)?'우당탕 운동회':isBlocks(r)?'블록 대결':mapName(roomSettings(r).mapId),count,capacity:isRace(r)?8:isBlocks(r)?4:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<(isRace(r)?8:isBlocks(r)?4:roomSettings(r).maxPlayers)};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
+export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(r))advanceRace(r,Date.now());else if(isBlocks(r))advanceBlocks(r,Date.now());else advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,kind:isRace(r)?'race':isBlocks(r)?'blocks':'hideout',mapName:isRace(r)?'우당탕 운동회':isBlocks(r)?'블록 대결':mapName(roomSettings(r).mapId),count,capacity:isRace(r)?CAPACITY:isBlocks(r)?4:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<(isRace(r)?CAPACITY:isBlocks(r)?4:roomSettings(r).maxPlayers)};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
 export async function POST(req:Request){try{
   if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'허용되지 않은 요청이에요.'},403);
   if(!await authorizedTeacher(req))return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
