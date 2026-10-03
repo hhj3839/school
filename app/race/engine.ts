@@ -1,19 +1,21 @@
-export const FINISH=160,STEP=50,DURATION=180000,CAPACITY=20;
-export const GAPS=[[42,47],[87,92],[109,117]];
+import {COURSE_LENGTH,courseSpeedScale,upcomingTurn} from './course';
+export const FINISH=COURSE_LENGTH,STEP=50,DURATION=180000,CAPACITY=20;
+export const RAFT=[151,159];
+export const GAPS=[[45,50],[113,118],RAFT];
 export const START=2;
 export const WALL_HEIGHT=5;
-export const SPINNERS=[20,68,133];
-export const MOVERS=[52,99];
+export const SPINNERS=[20,96,134];
+export const MOVERS=[64,142];
 export const moverX=(time:number,z:number)=>Math.sin(time*1.2+z)*4;
 export const spinnerAngle=(time:number,z:number)=>time*2.1+z;
-export const WALLS=[{x:-4,z:12,w:5},{x:3,z:153,w:6}];
-export const GATES=[38,126];
-export const PENDULUMS=[28,82,141];
-export const BELTS=[{z:58,d:7,dir:1},{z:74,d:6,dir:-1},{z:146,d:6,dir:1}];
-export const BOUNCERS=[61,120];
+export const WALLS=[{x:-4,z:12,w:5},{x:3,z:215,w:6}];
+export const GATES=[88,202];
+export const PENDULUMS=[28,163,209];
+export const BELTS=[{z:72,d:7,dir:1},{z:146,d:6,dir:-1},{z:196,d:4,dir:1}];
+export const BOUNCERS=[80,166];
 export const gateAngle=(time:number,z:number)=>time*.85+z;
 export function pendulum(time:number,z:number){const x=Math.sin(time*1.65+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
-export function courseHint(z:number){if(z<16)return '높은 벽은 옆으로 피해요';if(z<24)return '회전 막대는 점프!';if(z<34)return '흔들리는 공을 보고 빈틈으로!';if(z<42)return '회전문이 열릴 때 통과해요';if(z<48)return '분홍색 끝에서 점프!';if(z<65)return '화살표 바닥이 옆으로 밀어요';if(z<87)return '막대와 공을 조심해요';if(z<94)return '바다 틈을 점프로 건너요';if(z<106)return '움직이는 벽의 빈틈을 찾아요';if(z<118)return '움직이는 발판을 따라가요';if(z<132)return '점프 발판 다음은 회전문!';if(z<150)return '마지막 공과 밀리는 바닥을 조심!';return '분홍색 문을 먼저 통과하면 우승!';}
+export function courseHint(z:number){const turn=upcomingTurn(z);if(turn)return turn.label+' · 길을 따라가요! 카메라는 자동으로 돌아요';if(z<16)return '높은 벽은 옆으로 피해요';if(z<24)return '회전 막대는 점프!';if(z<34)return '흔들리는 공의 빈틈으로!';if(z<69)return '움직이는 벽을 피해요';if(z<84)return '밀리는 바닥 다음은 점프 발판!';if(z<104)return '회전문과 막대의 타이밍을 봐요';if(z<140)return '회전 막대는 점프!';if(z<151)return '움직이는 벽과 밀리는 바닥을 조심!';if(z<160)return '보라색 움직이는 발판을 따라가요';if(z<170)return '흔들리는 공 다음은 점프 발판!';if(z<208)return '마지막 회전문이 열릴 때!';return '분홍색 결승문을 먼저 통과하면 우승!';}
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
@@ -25,11 +27,11 @@ export function makeRace(code:string,p:Racer):RaceRoom{return {kind:'race',code,
 export function startRace(r:RaceRoom,now:number){r.round++;r.finishers=[];r.phase='playing';r.start=now+3000;r.end=r.start+DURATION;r.paused=0;r.winner='';r.players=r.players.map((p,i)=>({...makeRacer(p.id,p.name,r.start,i),token:p.token,last:now,x:(i-(r.players.length-1)/2)*Math.min(2.1,11.6/Math.max(1,r.players.length-1))}));}
 export function raceTime(r:RaceRoom,now:number){return Math.max(0,((r.paused||now)-r.start)/1000);}
 export function platformX(time:number){return Math.sin(time*.8)*3.5;}
-export function ground(x:number,z:number,time:number){if(Math.abs(x)>7||z< -3||z>168)return false;for(const [a,b] of GAPS)if(z>a&&z<b)return a===109&&Math.abs(x-platformX(time))<2.8;return true;}
+export function ground(x:number,z:number,time:number){if(Math.abs(x)>7||z< -3||z>FINISH+8)return false;for(const [a,b] of GAPS)if(z>a&&z<b)return a===RAFT[0]&&Math.abs(x-platformX(time))<2.8;return true;}
 export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  if(r.phase!=='playing'||r.paused||at<r.start||at>r.end||p.finished)return;
  const dt=STEP/1000,t=raceTime(r,at),norm=Math.max(1,Math.hypot(c.x,c.z)),ox=p.x,oz=p.z;
- if(at>=p.stun){p.x+=c.x/norm*9*dt;p.z+=c.z/norm*9*dt;}else p.z-=2*dt;
+ if(at>=p.stun){p.x+=c.x/norm*9*dt;p.z+=c.z/norm*9*dt/courseSpeedScale(ox,oz);}else p.z-=2*dt;
  p.z=Math.max(-2,p.z);
  if(p.y===0&&at>=p.stun)for(const b of BELTS)if(Math.abs(p.z-b.z)<b.d/2)p.x+=b.dir*3.2*dt;
  if(c.jump&&p.y===0&&ground(ox,oz,t))p.vy=9;

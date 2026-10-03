@@ -49,7 +49,7 @@ for(let i=0;i<3600&&!p.finished;i++){
  const nextWall=[...engine.WALLS,...engine.MOVERS.map(z=>({x:engine.moverX(engine.raceTime(r,at),z),z,w:5}))].filter(w=>w.z>p.z-1.1).sort((a,b)=>a.z-b.z)[0];
  if(nextWall&&nextWall.z-p.z<8)target=nextWall.x<0?5:-5;
  for(const z of engine.GATES)if(p.z>z-7&&p.z<z+5)target=5;
- if(p.z>104&&p.z<119)target=engine.platformX(engine.raceTime(r,at));
+ if(p.z>engine.RAFT[0]-5&&p.z<engine.RAFT[1]+2)target=engine.platformX(engine.raceTime(r,at));
  let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a)||engine.SPINNERS.some(z=>Math.abs(z-p.z)<6);
  const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
 }
