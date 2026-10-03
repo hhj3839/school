@@ -1,6 +1,5 @@
 import {database} from '../../../db/raw';
 import {classroomState} from '../../classroom';
-import {authorizedTeacher} from '../../teacher-auth';
 import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-limits';
 import {advanceBlocks,blockCommand,finishBlocks,isBlocks,makeBlockPlayer,makeBlockRoom,pauseBlocks,publicBlocks,startBlocks,type Command} from '../../blocks/engine';
 export const dynamic='force-dynamic';
@@ -12,15 +11,14 @@ export async function POST(req:Request){try{
  const a=JSON.parse(raw),db=database(),now=Date.now(),gate=await classroomState();
  if(!gate.open)return reply({error:'선생님이 모든 게임을 종료했어요.'},423);
  if(a.action==='create'){
-  const teacher=await authorizedTeacher(req);if(req.headers.has('authorization')&&!teacher)return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
-  if(!gate.studentCreate&&!teacher)return reply({error:'선생님이 방 만들기를 허용하면 만들 수 있어요.'},403);
+  
+  
   await cleanIdleRooms(now);
   const code=Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[b%29]).join('');
   const p=makeBlockPlayer(crypto.randomUUID(),String(a.name||'친구').trim().slice(0,12)||'친구',now,seed());p.token=crypto.randomUUID();const r=makeBlockRoom(code,p,a.attack!==false),state=JSON.stringify(r);
   const [saved]=await db.batch([
-   db.prepare('INSERT OR IGNORE INTO rooms(code,state,version,expires) SELECT ?,?,0,? WHERE EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=? AND last_created<=? AND (student_create=1 OR ?=1)) AND (SELECT COUNT(*) FROM rooms WHERE expires>?)<?').bind(code,state,now+ROOM_IDLE_MS,gate.revision,now-CREATE_GAP_MS,teacher?1:0,now,MAX_ROOMS),
-   db.prepare('UPDATE classroom SET last_created=? WHERE id=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND state=?)').bind(now,code,state),
-   db.prepare('UPDATE classroom SET featured_code=? WHERE id=1 AND ?=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND state=?)').bind(code,teacher?1:0,code,state)
+   db.prepare('INSERT OR IGNORE INTO rooms(code,state,version,expires) SELECT ?,?,0,? WHERE EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=? AND last_created<=?) AND (SELECT COUNT(*) FROM rooms WHERE expires>?)<?').bind(code,state,now+ROOM_IDLE_MS,gate.revision,now-CREATE_GAP_MS,now,MAX_ROOMS),
+   db.prepare('UPDATE classroom SET last_created=? WHERE id=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND state=?)').bind(now,code,state)
   ]);
   if(saved.meta.changes)return reply({room:publicBlocks(r),id:p.id,token:p.token,serverTime:now});
   const count=await db.prepare('SELECT COUNT(*) AS n FROM rooms WHERE expires>?').bind(now).first<{n:number}>();
@@ -36,7 +34,7 @@ export async function POST(req:Request){try{
   if(!r.players.some(p=>p.id===r.host))r.host=r.players[0].id;
   advanceBlocks(r,now);let p=r.players.find(p=>p.token===a.token),newToken:string|undefined;
   if(a.action==='join'&&!p){
-   if(!gate.studentCreate&&gate.featuredCode!==code)return reply({error:'선생님이 지정한 우리 반으로 들어가 주세요.'},403);
+   
    if(r.phase==='playing')return reply({error:'경기 중이에요. 이번 판이 끝나면 들어올 수 있어요.'},409);
    if(r.players.length>=4)return reply({error:'4명이 모두 모였어요. 다른 방에 들어가 주세요.'},409);
    p=makeBlockPlayer(crypto.randomUUID(),String(a.name||'친구').trim().slice(0,12)||'친구',now,seed());newToken=crypto.randomUUID();p.token=newToken;r.players.push(p);
@@ -59,7 +57,7 @@ export async function POST(req:Request){try{
   }else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
   if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;
   if(JSON.stringify(r)===before)return reply({room:publicBlocks(r),id:p.id,serverTime:now});
-  const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=? AND (?=0 OR student_create=1 OR featured_code=?))').bind(JSON.stringify(r),now+ROOM_IDLE_MS,code,row.version,now,gate.revision,a.action==='join'?1:0,code).run();
+  const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(r),now+ROOM_IDLE_MS,code,row.version,now,gate.revision).run();
   if(saved.meta.changes)return reply(a.action==='leave'?{left:true}:{room:publicBlocks(r),id:p.id,...(newToken?{token:newToken}:{}),serverTime:now});
   await new Promise(resolve=>setTimeout(resolve,10+Math.random()*15));
  }

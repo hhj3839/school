@@ -13,7 +13,14 @@ export async function POST(req:Request){try{
   if(!await authorizedTeacher(req))return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
   const raw=await req.text();if(raw.length>100)return reply({error:'잘못된 요청이에요.'},400);
   const {action,code}=JSON.parse(raw);
-  if(action==='allowStudentRooms'||action==='restrictStudentRooms'){await database().prepare('UPDATE classroom SET student_create=? WHERE id=1').bind(action==='allowStudentRooms'?1:0).run();return reply(await classroomState());}
+  if(action==='deleteRoom'){
+    if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
+    const [deleted]=await database().batch([
+      database().prepare('DELETE FROM rooms WHERE code=?').bind(code),
+      database().prepare('UPDATE classroom SET featured_code=NULL WHERE id=1 AND featured_code=?').bind(code)
+    ]);
+    return reply({deleted:deleted.meta.changes>0,code});
+  }
   if(action==='check')return reply(await classroomState());
   if(action==='status'){
     const now=Date.now(),db=database();await cleanIdleRooms(now);const rows=await db.prepare('SELECT state FROM rooms WHERE expires>? ORDER BY version DESC').bind(now).all<{state:string}>();

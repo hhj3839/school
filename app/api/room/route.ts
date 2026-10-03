@@ -1,7 +1,6 @@
 import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-limits';
 import {visibleTo,shotTarget,validAim} from '../../server-vision';
 import {HEARTBEAT_MS} from '../../network-policy';
-import {authorizedTeacher} from '../../teacher-auth';
 import {classroomState} from '../../classroom';
 import {packPaint,unpackPaint} from '../../paint-codec';
 import { database } from '../../../db/raw';
@@ -14,13 +13,12 @@ export async function POST(req:Request){try{
  const raw=await req.text();if(raw.length>250000)return reply({error:'요청이 너무 커요.'},413);
  const a=JSON.parse(raw),db=database(),now=Date.now();
  const gate=await classroomState();if(!gate.open)return reply({closed:true,error:'선생님이 모든 게임을 종료했어요.'},423);
- if(a.action==='create'){const teacher=await authorizedTeacher(req);if(req.headers.has('authorization')&&!teacher)return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);if(!gate.studentCreate&&!teacher)return reply({error:'선생님만 방을 만들 수 있어요. 우리 반 들어가기를 눌러 주세요.'},403);const settings=a.settings===undefined?{...DEFAULT_SETTINGS}:parseSettings(a.settings);if(!settings)return reply({error:'방 설정을 확인해 주세요.'},400);
+ if(a.action==='create'){const settings=a.settings===undefined?{...DEFAULT_SETTINGS}:parseSettings(a.settings);if(!settings)return reply({error:'방 설정을 확인해 주세요.'},400);
  await cleanIdleRooms(now);
- const token=crypto.randomUUID(),id=crypto.randomUUID(),name=String(a.name||'선생님').trim().slice(0,12)||'선생님';
+ const token=crypto.randomUUID(),id=crypto.randomUUID(),name=String(a.name||'친구').trim().slice(0,12)||'친구';
  for(let i=0;i<4;i++){const bytes=crypto.getRandomValues(new Uint8Array(6)),alphabet='ABCDEFGHJKMNPQRSTUVWXYZ23456789',code=Array.from(bytes,b=>alphabet[b%alphabet.length]).join('');const p=makePlayer(id,name,now);p.token=token;const r=makeRoom(code,p);r.settings=settings;const [saved]=await db.batch([
- db.prepare('INSERT OR IGNORE INTO rooms(code,state,version,expires) SELECT ?,?,0,? WHERE EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=? AND last_created<=? AND (student_create=1 OR ?=1)) AND (SELECT COUNT(*) FROM rooms WHERE expires>?)<?').bind(code,JSON.stringify(wireRoom(r)),now+ROOM_IDLE_MS,gate.revision,now-CREATE_GAP_MS,teacher?1:0,now,MAX_ROOMS),
- db.prepare('UPDATE classroom SET last_created=? WHERE id=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND state=?)').bind(now,code,JSON.stringify(wireRoom(r))),
- db.prepare('UPDATE classroom SET featured_code=? WHERE id=1 AND ?=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND state=?)').bind(code,teacher?1:0,code,JSON.stringify(wireRoom(r)))
+ db.prepare('INSERT OR IGNORE INTO rooms(code,state,version,expires) SELECT ?,?,0,? WHERE EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=? AND last_created<=?) AND (SELECT COUNT(*) FROM rooms WHERE expires>?)<?').bind(code,JSON.stringify(wireRoom(r)),now+ROOM_IDLE_MS,gate.revision,now-CREATE_GAP_MS,now,MAX_ROOMS),
+ db.prepare('UPDATE classroom SET last_created=? WHERE id=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND state=?)').bind(now,code,JSON.stringify(wireRoom(r)))
  ]);if(saved.meta.changes)return reply({room:wireRoom(publicRoom(r,id)),id,token,serverTime:now});if(!await db.prepare('SELECT code FROM rooms WHERE code=?').bind(code).first())break;}
  const current=await classroomState();if(!current.open||current.revision!==gate.revision)return reply({error:'게임 시간이 바뀌었어요. 다시 들어와 주세요.'},423);
  const capacity=await db.prepare('SELECT COUNT(*) AS total FROM rooms WHERE expires>?').bind(now).first<{total:number}>();
@@ -31,7 +29,7 @@ export async function POST(req:Request){try{
  for(let retry=0;retry<32;retry++){
  const row=await db.prepare('SELECT state,version,expires FROM rooms WHERE code=?').bind(code).first<{state:string;version:number;expires:number}>();if(!row||row.expires<now)return reply({error:'방이 없거나 사용 시간이 끝났어요.'},404);
  const rawRoom=JSON.parse(row.state);if(rawRoom.kind==='blocks')return reply({error:'블록 대결 방이에요. 블록 대결 화면에서 들어가 주세요.'},409);const r=rawRoom as Room;const lifecycle=()=>[r.phase,r.end,r.paused,r.winner,r.host,r.players.length].join('|'),beforeLifecycle=lifecycle();r.players=r.players.filter(p=>now-p.last<ROOM_IDLE_MS);if(!r.players.length){await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();return reply({error:'접속이 없어 방이 정리됐어요. 새 방으로 들어와 주세요.'},404);}if(!r.players.some(p=>p.id===r.host))r.host=r.players[0].id;advance(r,now);let p=r.players.find(p=>p.token===a.token);let token:string|undefined;
- if(a.action==='join'&&!p){if(!gate.studentCreate&&gate.featuredCode!==code)return reply({error:'선생님이 지정한 우리 반으로 들어와 주세요.'},403);if(r.phase!=='lobby'&&r.phase!=='result')return reply({error:'게임 중이에요. 다음 판에 들어와 주세요.'},409);if(r.players.length>=roomSettings(r).maxPlayers)return reply({error:'방 정원이 모두 찼어요. 다른 방을 이용해 주세요.'},409);p=makePlayer(crypto.randomUUID(),String(a.name||'친구').trim().slice(0,12)||'친구',now);token=crypto.randomUUID();p.token=token;r.players.push(p);}
+ if(a.action==='join'&&!p){if(r.phase!=='lobby'&&r.phase!=='result')return reply({error:'게임 중이에요. 다음 판에 들어와 주세요.'},409);if(r.players.length>=roomSettings(r).maxPlayers)return reply({error:'방 정원이 모두 찼어요. 다른 방을 이용해 주세요.'},409);p=makePlayer(crypto.randomUUID(),String(a.name||'친구').trim().slice(0,12)||'친구',now);token=crypto.randomUUID();p.token=token;r.players.push(p);}
  if(!p)return reply({error:'입장 정보가 없어요. 방 코드로 다시 들어와 주세요.'},401);
  const motion=()=>[p!.x,p!.y,p!.elevation||0,p!.angle||0,p!.viewYaw||0,p!.viewPitch||0].join('|'),beforeMotion=motion();let shot:{hit:boolean}|undefined;
  if(a.action==='settings'){if(r.host!==p.id)return reply({error:'방장만 설정할 수 있어요.'},403);if(!['lobby','result'].includes(r.phase))return reply({error:'설정은 대기 중이나 판이 끝난 뒤에 바꿔 주세요.'},409);const settings=parseSettings(a.settings);if(!settings||settings.maxPlayers<r.players.length)return reply({error:'설정을 확인해 주세요. 정원은 현재 인원보다 작을 수 없어요.'},400);r.settings=settings;}
@@ -45,7 +43,7 @@ export async function POST(req:Request){try{
  else if(a.action==='leave'){r.players=r.players.filter(q=>q.id!==p!.id);if(r.host===p.id&&r.players.length)r.host=r.players[0].id;if(!r.players.length){const deleted=await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();if(deleted.meta.changes)return reply({left:true});continue;}if(!r.players.some(q=>q.role==='seeker')&&!['lobby','result'].includes(r.phase)){r.phase='result';r.winner='술래가 나가서 판이 끝났어요';}advance(r,now);}
  else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
  if(['state','tick'].includes(a.action)&&lifecycle()===beforeLifecycle&&motion()===beforeMotion&&now-p.last<HEARTBEAT_MS&&row.expires>now+HEARTBEAT_MS)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,serverTime:now});
- p.last=now;const result=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=? AND (?=0 OR student_create=1 OR featured_code=?))').bind(JSON.stringify(wireRoom(r)),now+ROOM_IDLE_MS,code,row.version,now,gate.revision,a.action==='join'?1:0,code).run();if(result.meta.changes)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,...(shot?{shot}:{}),...(token?{token}:{}),serverTime:now});
+ p.last=now;const result=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(wireRoom(r)),now+ROOM_IDLE_MS,code,row.version,now,gate.revision).run();if(result.meta.changes)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,...(shot?{shot}:{}),...(token?{token}:{}),serverTime:now});
   await new Promise(resolve=>setTimeout(resolve,5+Math.floor(Math.random()*20)));
  }return reply({error:'잠시 연결이 밀렸어요. 다시 시도해 주세요.'},503);
  }catch(e){console.error('room request',e);return reply({error:'연결하지 못했어요. 잠시 후 다시 시도해 주세요.'},500);}}

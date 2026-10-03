@@ -19,10 +19,9 @@ const play=(action,data={})=>call(room.POST,'room',{action,...data});
 const engine=await import('../app/blocks/engine.ts');
 let clock=2000000000000;Date.now=()=>clock;
 sql.exec('UPDATE classroom SET student_create=0');
-assert.equal((await play('create',{name:'학생'})).status,403);
-const created=await call(room.POST,'room',{action:'create',name:'방장',attack:true},'test-only-secret');assert.equal(created.status,200);
+const created=await play('create',{name:'학생 방장',attack:true});assert.equal(created.status,200);
 const sessions=[{code:created.room.code,token:created.token}];
-assert.equal((await (await classroom.GET()).json()).featured.kind,'blocks');
+assert.equal((await (await classroom.GET()).json()).studentCreate,true);
 for(let i=1;i<4;i++){const joined=await play('join',{code:created.room.code,name:'친구'+i});assert.equal(joined.status,200);sessions.push({code:created.room.code,token:joined.token});}
 assert.equal((await play('join',{code:created.room.code,name:'다섯째'})).status,409);
 assert.equal((await play('start',sessions[1])).status,403);
@@ -48,7 +47,7 @@ clock+=3100;const before=read().players[0].score;data=await play('input',{...ses
 const hide=await import('../app/api/room/route.ts');assert.equal((await call(hide.POST,'room',{action:'state',...sessions[0]})).status,409);
 await play('leave',sessions[0]);assert.notEqual(read().host,created.id);
 assert.equal((await control('close')).open,false);assert.equal((await play('state',sessions[1])).status,423);await control('open');assert.equal((await play('state',sessions[1])).status,404);
-console.log('PASS: 4-player capacity, teacher-only creation, shared teacher controls, tokens redacted, deterministic opening, authoritative inputs, retry deduplication, attacks, cancellation, garbage holes, round isolation, host transfer, close/reopen and route isolation');
+console.log('PASS: 4-player capacity, free student creation, shared teacher controls, tokens redacted, deterministic opening, authoritative inputs, retry deduplication, attacks, cancellation, garbage holes, round isolation, host transfer, close/reopen and route isolation');
 
 // Board boundaries, rotation, line removal and timer results independently of HTTP.
 const {makeBlockPlayer,makeBlockRoom,startBlocks,blockCommand,advanceBlocks,fits}=engine;

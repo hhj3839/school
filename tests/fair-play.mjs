@@ -17,20 +17,14 @@ const play=(action,data={})=>call(room.POST,'room',{action,...data});
 
 const {ammunition,finalHint,spectatorPlayers,makeRoom,makePlayer}=await import('../app/game.ts');
 sql.exec('UPDATE classroom SET student_create=0');
-assert.equal((await play('create',{name:'학생'})).status,403);
-assert.equal((await call(room.POST,'room',{action:'create',name:'학생'},'wrong')).status,401);
-const teacher=await call(room.POST,'room',{action:'create',name:'선생님'},'test-only-secret');assert.equal(teacher.status,200);
+const teacher=await play('create',{name:'학생 방장'});assert.equal(teacher.status,200);
 const session={code:teacher.room.code,token:teacher.token};
-const gate=await (await classroom.GET()).json();assert.equal(gate.featured.code,session.code);assert.equal(gate.studentCreate,false);
+const gate=await (await classroom.GET()).json();assert.equal(gate.studentCreate,true);
 assert.ok(!JSON.stringify(gate).includes(teacher.token));
 assert.equal((await play('join',{code:session.code,name:'친구'})).status,200);
-assert.equal((await control('allowStudentRooms','wrong')).status,401);
-assert.equal((await control('allowStudentRooms')).studentCreate,true);
 sql.exec('UPDATE classroom SET last_created=0');
 const other=await play('create',{name:'다른 방'});assert.equal(other.status,200);
-await control('restrictStudentRooms');
-assert.equal((await play('join',{code:other.room.code,name:'미지정 방 입장'})).status,403);
-assert.equal((await play('state',{code:other.room.code,token:other.token})).status,200,'existing participants continue');
+assert.equal((await play('join',{code:other.room.code,name:'자유 입장'})).status,200);
 let now=Date.now();const realNow=Date.now;Date.now=()=>now;
 try{
  await play('next',session);await play('next',session);
@@ -46,4 +40,4 @@ try{
  assert.ok(spectatorPlayers(r).every(p=>p.role==='seeker'));
  await control('close');assert.equal((await play('create',{name:'학생'})).status,423);
 }finally{Date.now=realNow;}
-console.log('PASS: default teacher-only creation, credential checks, automatic featured room, authorized policy toggle, restricted joins, existing sessions, server-enforced magazine/reload, paused reload, seeker camera sync/clamp, coarse timed hints, seeker-only watch targets');
+console.log('PASS: free student creation and joins with legacy restrictions disabled, server-enforced magazine/reload, paused reload, seeker camera sync/clamp, coarse timed hints, seeker-only watch targets');
