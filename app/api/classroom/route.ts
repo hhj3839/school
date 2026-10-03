@@ -1,3 +1,4 @@
+import {MAX_ROOMS,ROOM_IDLE_MS,cleanIdleRooms} from '../../room-limits';
 import { env } from 'cloudflare:workers';
 import { database } from '../../../db/raw';
 import {teacherRoomSummary} from '../../teaching';
@@ -20,9 +21,9 @@ export async function POST(req:Request){try{
   const {action,code}=JSON.parse(raw);
   if(action==='check')return reply(await classroomState());
   if(action==='status'){
-    const now=Date.now(),db=database(),rows=await db.prepare('SELECT state FROM rooms WHERE expires>? ORDER BY version DESC LIMIT 100').bind(now).all<{state:string}>();
+    const now=Date.now(),db=database();await cleanIdleRooms(now);const rows=await db.prepare('SELECT state FROM rooms WHERE expires>? ORDER BY version DESC').bind(now).all<{state:string}>();
     const rooms=rows.results.map(row=>JSON.parse(row.state) as Room).filter(r=>r.players.some(p=>now-p.last<120000)).map(r=>teacherRoomSummary(r,now));
-    return reply({rooms,updatedAt:now});
+    return reply({rooms,updatedAt:now,limits:{maxRooms:MAX_ROOMS,idleSeconds:ROOM_IDLE_MS/1000},totals:{rooms:rooms.length,playing:rooms.filter(r=>!['lobby','result'].includes(r.phase)).length,online:rooms.reduce((n,r)=>n+r.online,0)}});
   }
   if(['pauseRoom','resumeRoom','endRoom'].includes(action)){
     if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
@@ -44,7 +45,7 @@ export async function POST(req:Request){try{
   const db=database();
   // The switch and room invalidation commit together. Reopening never revives old rooms.
   await db.batch([
-    db.prepare('UPDATE classroom SET opened=?,revision=revision+1 WHERE id=1').bind(action==='open'?1:0),
+    db.prepare('UPDATE classroom SET opened=?,revision=revision+1,last_created=0 WHERE id=1').bind(action==='open'?1:0),
     db.prepare('UPDATE rooms SET expires=0'),
   ]);
   return reply(await classroomState());

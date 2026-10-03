@@ -1,0 +1,1 @@
+ALTER TABLE `classroom` ADD `last_created` integer DEFAULT 0 NOT NULL;
