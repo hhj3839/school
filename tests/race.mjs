@@ -46,12 +46,16 @@ await control('close');assert.equal((await play('create',{name:'닫힘'})).statu
 const r=engine.practiceRace('완주 연습',clock),p=r.players[0];let at=r.start;
 for(let i=0;i<3600&&!p.finished;i++){
  at+=50;p.last=at;let target=0;
- for(const w of engine.WALLS)if(p.z>w.z-7&&p.z<w.z+3)target=w.x<0?4:-4;
+ const nextWall=[...engine.WALLS,...engine.MOVERS.map(z=>({x:engine.moverX(engine.raceTime(r,at),z),z,w:5}))].filter(w=>w.z>p.z-1.1).sort((a,b)=>a.z-b.z)[0];
+ if(nextWall&&nextWall.z-p.z<8)target=nextWall.x<0?5:-5;
  if(p.z>104&&p.z<119)target=engine.platformX(engine.raceTime(r,at));
  let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a)||engine.SPINNERS.some(z=>Math.abs(z-p.z)<6);
  const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
 }
-assert.ok(p.finished,'course is traversable within three minutes');assert.equal(r.phase,'result');
-const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=2;q.x=10;q.z=102;q.y=-4.9;q.vy=-5;engine.stepRacer(f,q,{seq:1,x:0,z:0,jump:false},f.start+50);assert.equal(q.z,96);assert.equal(q.falls,1);
+assert.ok(p.finished,'course is traversable within three minutes: '+JSON.stringify({z:p.z,x:p.x,peak:p.peak,falls:p.falls}));assert.equal(r.phase,'result');
+const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=2;q.x=10;q.z=102;q.y=-4.9;q.vy=-5;engine.stepRacer(f,q,{seq:1,x:0,z:0,jump:false},f.start+50);assert.equal(q.z,engine.START);assert.equal(q.checkpoint,0);assert.equal(q.falls,1);
+// Neither normal jumps nor bounce-pad height can clear a tall wall.
+for(const vy of [9,12]){const wall=engine.WALLS[0],r=engine.practiceRace('벽 점프',clock),p=r.players[0];p.x=wall.x;p.z=wall.z-2;p.vy=vy;let maxY=0;for(let i=1;i<=30;i++){engine.stepRacer(r,p,{seq:i,x:0,z:1,jump:true},r.start+i*50);maxY=Math.max(maxY,p.y);assert.ok(p.z<wall.z-1,'wall cannot be jumped through');}assert.ok(maxY<engine.WALL_HEIGHT);}
+const moving=engine.practiceRace('움직이는 벽',clock),runner=moving.players[0],mz=engine.MOVERS[0];runner.x=engine.moverX(.05,mz);runner.z=mz-1.2;runner.y=2;engine.stepRacer(moving,runner,{seq:1,x:0,z:1,jump:false},moving.start+50);assert.ok(runner.z<mz-1,'moving wall collision uses rendered position');
 const multi=engine.makeRace('TESTAA',engine.makeRacer('a','a',clock));multi.players.push(engine.makeRacer('b','b',clock));engine.startRace(multi,clock);multi.players[0].finished=5000;engine.advanceRace(multi,multi.start+6000);assert.equal(multi.phase,'playing','one finisher does not stop other runners');multi.players.forEach(p=>p.last=multi.end);engine.advanceRace(multi,multi.end);assert.equal(multi.phase,'result');
-console.log('PASS: 8 players, capacity/auth/isolation, input limits/dedupe, teacher pause/end/delete/all-stop, restart, complete course, checkpoint recovery and remaining runners');
+console.log('PASS: 8 players, capacity/auth/isolation, input limits/dedupe, teacher pause/end/delete/all-stop, restart, complete course, start-line recovery and remaining runners');

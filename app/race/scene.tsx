@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import * as THREE from 'three';
-import {CHECKPOINTS,FINISH,GAPS,SPINNERS,WALLS,PALETTE,platformX,raceTime,type RaceRoom} from './engine';
+import {START,WALL_HEIGHT,MOVERS,moverX,spinnerAngle,FINISH,GAPS,SPINNERS,WALLS,PALETTE,platformX,raceTime,type RaceRoom} from './engine';
 export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  const host=useRef<HTMLDivElement>(null),live=useRef({room,id,now}),[failed,setFailed]=useState(false);live.current={room,id,now};
  useEffect(()=>{const el=host.current!;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{setFailed(true);return;}
@@ -16,10 +16,11 @@ export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  for(const [a,b] of segments){box(0,-.6,(a+b)/2,14,1.2,b-a,'#ffe4ac');box(-7,-.15,(a+b)/2,.3,.3,b-a,'#f6b39a');box(7,-.15,(a+b)/2,.3,.3,b-a,'#f6b39a');for(let z=a+1;z<b;z+=3)box(0,.008,z,13.6,.015,.06,'#e8c991');}
  for(const [a,b] of GAPS){box(0,.015,a-.3,14,.04,.4,'#f593a2');box(0,.015,b+.3,14,.04,.4,'#f593a2');}
  const raft=box(0,-.35,113,5.6,.7,8.2,'#9a91df');for(let z=110;z<117;z+=2)box(0,.02,z-113,5.2,.04,.18,'#d4cef4',raft);
- WALLS.forEach(w=>{box(w.x,.65,w.z,w.w,1.3,1.4,'#efa888');box(w.x,1.32,w.z,w.w,.1,1.4,'#ffd5b3');});
+ function wall(x:number,z:number,w:number,moving=false){const group=new THREE.Group();group.position.set(x,0,z);scene.add(group);box(0,WALL_HEIGHT/2,0,w,WALL_HEIGHT,1.4,moving?'#9e92db':'#efa888',group);box(0,WALL_HEIGHT+.04,0,w,.08,1.4,moving?'#d9d2fc':'#ffe0c2',group);for(let y=.5;y<WALL_HEIGHT;y+=1)box(0,y,-.71,w,.12,.03,moving?'#c8bfee':'#ffcaac',group);return group;}
+ WALLS.forEach(w=>wall(w.x,w.z,w.w));const movingWalls=MOVERS.map(z=>{box(0,.025,z,13,.05,1.6,'#d6caf1');return wall(0,z,5,true);});
  const beams=SPINNERS.map((z,i)=>{const pivot=new THREE.Group();pivot.position.set(0,.65,z);scene.add(pivot);box(0,0,0,12,.45,.55,i%2?'#9489d7':'#ef91aa',pivot);sphere(0,.05,0,.7,'#fff1b9',pivot);return pivot;});
  for(const z of [56,124]){box(0,.03,z,4.8,.08,2.8,'#84d4b9');box(0,.09,z,.5,.06,1.8,'#fff7d3');box(0,.09,z+ .5,1.7,.06,.4,'#fff7d3');}
- for(const z of CHECKPOINTS.slice(1)){box(0,.015,z,14,.03,1,'#9cdac8');for(const x of [-6.5,6.5]){box(x,1.5,z,.16,3,.16,'#fffefa');box(x-.55,2.6,z,1,.7,.08,'#57b798');}}
+ box(0,.015,START-1,14,.03,.8,'#9cdac8');
  for(let i=0;i<14;i++)for(let j=0;j<2;j++)box(i-6.5,.03,FINISH+j*.6,1,.05,.6,(i+j)%2?'#49647e':'#fffdf4');
  box(-6,2.6,FINISH,.5,5.2,.5,'#f7a6ab');box(6,2.6,FINISH,.5,5.2,.5,'#f7a6ab');box(0,5.2,FINISH,12.5,.8,.6,'#f7a6ab');
  for(let z=5;z<166;z+=15){for(const x of [-11,11]){box(x,-1,z,4,1.5,4,'#97d5b5');box(x,.9,z,.2,2.4,.2,'#fff8dc');box(x-.7,1.7,z,1.4,.8,.12,z%2?'#f3be68':'#ac9fdd');}}
@@ -27,7 +28,7 @@ export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  function avatar(key:string,color:number){const a=new THREE.Group(),c=PALETTE[color%PALETTE.length];sphere(0,.9,0,.65,c,a);sphere(0,1.6,0,.55,c,a);sphere(-.22,1.7,.46,.105,'#344e59',a);sphere(.22,1.7,.46,.105,'#344e59',a);sphere(-.3,.23,0,.23,'#fff8e8',a);sphere(.3,.23,0,.23,'#fff8e8',a);box(0,1.05,-.51,.8,.6,.2,'#fff2bd',a);scene.add(a);avatars.set(key,a);return a;}
  let raf=0;const resize=()=>{const {width,height}=el.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/Math.max(1,height);camera.updateProjectionMatrix();};const observer=new ResizeObserver(resize);observer.observe(el);resize();
  const render=()=>{const {room:r,id,now}=live.current,t=raceTime(r,now),me=r.players.find(p=>p.id===id)||r.players[0];
-  beams.forEach((b,i)=>b.rotation.y=-(t*1.65+SPINNERS[i]));raft.position.x=platformX(t);
+  beams.forEach((b,i)=>b.rotation.y=-spinnerAngle(t,SPINNERS[i]));raft.position.x=platformX(t);movingWalls.forEach((w,i)=>w.position.x=moverX(t,MOVERS[i]));
   for(const p of r.players){const a=avatars.get(p.id)||avatar(p.id,p.color);const goal=new THREE.Vector3(p.x,p.y,p.z);if(a.userData.ready)a.position.lerp(goal,.38);else{a.position.copy(goal);a.userData.ready=true;}a.rotation.y=Math.sin(t*3+p.color)*.05;}
   for(const [key,a]of avatars)if(!r.players.some(p=>p.id===key)){scene.remove(a);avatars.delete(key);}
   if(me){const follow=me.finished?(r.players.find(p=>!p.finished)||me):me;camera.position.set(follow.x*.35,18,follow.z-20);camera.lookAt(follow.x*.25,0,follow.z+8);}
