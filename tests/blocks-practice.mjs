@@ -1,0 +1,11 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+import {makeBlockPractice,advanceBlocks,blockCommand,pauseBlocks} from '../app/blocks/engine.ts';
+const r=makeBlockPractice('연습',10000,123),p=r.players[0];
+advanceBlocks(r,r.start+900);assert.equal(r.phase,'playing');assert.equal(r.attack,false);assert.equal(p.piece.y,1);
+blockCommand(r,p,'drop',r.start+1000);assert.ok(p.score>0);assert.equal(p.sent,0);
+pauseBlocks(r,14000,true);const before=JSON.stringify(p.board),end=r.end;advanceBlocks(r,18000);assert.equal(JSON.stringify(p.board),before);pauseBlocks(r,19000,false);assert.equal(r.end,end+5000);
+p.out=true;advanceBlocks(r,19001);assert.equal(r.phase,'result');assert.equal(r.winner,'연습을 마쳤어요');
+const again=makeBlockPractice('연습',20000,456);assert.equal(again.players[0].score,0);assert.equal(again.players[0].board.some(Boolean),false);
+again.players[0].last=again.end;again.players[0].fallAt=again.end+1;advanceBlocks(again,again.end);assert.equal(again.phase,'result');
+console.log('PASS: solo gravity without instant victory, no attacks, pause/resume, top-out, time limit and fresh restart');

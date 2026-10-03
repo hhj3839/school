@@ -4,7 +4,7 @@ export const SHAPES=[[[0,1],[1,1],[2,1],[3,1]],[[0,0],[0,1],[1,1],[2,1]],[[2,0],
 export type Command='left'|'right'|'rotate'|'down'|'drop';
 export type Piece={kind:number;rotation:number;x:number;y:number};
 export type BlockPlayer={id:string;token?:string;name:string;last:number;board:number[];piece:Piece;queue:number[];seed:number;score:number;lines:number;sent:number;pending:number;incomingAt:number;out:boolean;outAt:number;fallAt:number;seq:number;inputAt:number;attackCursor:number};
-export type BlockRoom={kind:'blocks';code:string;host:string;players:BlockPlayer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;attack:boolean;winner:string};
+export type BlockRoom={kind:'blocks';practice?:boolean;code:string;host:string;players:BlockPlayer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;attack:boolean;winner:string};
 export function isBlocks(value:unknown):value is BlockRoom{return !!value&&typeof value==='object'&&'kind' in value&&value.kind==='blocks';}
 function random(p:BlockPlayer){p.seed=(Math.imul(p.seed,1664525)+1013904223)>>>0;return p.seed/4294967296;}
 function refill(p:BlockPlayer){if(p.queue.length>=7)return;const bag=[0,1,2,3,4,5,6];for(let i=6;i>0;i--){const j=Math.floor(random(p)*(i+1));[bag[i],bag[j]]=[bag[j],bag[i]];}p.queue.push(...bag);}
@@ -16,7 +16,7 @@ export function makeBlockRoom(code:string,p:BlockPlayer,attack=true):BlockRoom{r
 export function fallSpeed(p:BlockPlayer){return Math.max(280,850-Math.floor(p.lines/8)*75);}
 export function startBlocks(r:BlockRoom,now:number,seed:number){r.round++;r.phase='playing';r.start=now+3000;r.end=r.start+DURATION;r.paused=0;r.winner='';r.players=r.players.map(p=>({...makeBlockPlayer(p.id,p.name,r.start,seed),token:p.token,last:now}));}
 export function rankings(r:BlockRoom){return [...r.players].sort((a,b)=>Number(a.out)-Number(b.out)||b.score-a.score||b.lines-a.lines||b.outAt-a.outAt);}
-export function finishBlocks(r:BlockRoom,label?:string){r.phase='result';r.paused=0;const order=rankings(r),first=order[0],ties=order.filter(p=>first&&p.out===first.out&&p.score===first.score&&p.lines===first.lines&&(!p.out||p.outAt===first.outAt));r.winner=label||(ties.length>1?'공동 우승!':first?first.name+' 승리!':'이번 판이 끝났어요');}
+export function finishBlocks(r:BlockRoom,label?:string){r.phase='result';r.paused=0;const order=rankings(r),first=order[0],ties=order.filter(p=>first&&p.out===first.out&&p.score===first.score&&p.lines===first.lines&&(!p.out||p.outAt===first.outAt));r.winner=label||(r.practice?'연습을 마쳤어요':ties.length>1?'공동 우승!':first?first.name+' 승리!':'이번 판이 끝났어요');}
 function settle(r:BlockRoom,p:BlockPlayer,now:number){
  const squares=cells(p.piece);if(squares.some(([,y])=>y<0)){p.out=true;p.outAt=now;return;}
  for(const [x,y] of squares)p.board[y*COLS+x]=p.piece.kind+1;
@@ -39,8 +39,10 @@ export function advanceBlocks(r:BlockRoom,now:number){
  // Resolve gravity chronologically for all boards, independent of which player polled.
  for(let step=0;step<1000;step++){const p=r.players.filter(q=>!q.out&&q.fallAt<=until).sort((a,b)=>a.fallAt-b.fallAt)[0];if(!p)break;const at=p.fallAt;p.fallAt=at+fallSpeed(p);if(fits(p,{...p.piece,y:p.piece.y+1}))p.piece.y++;else settle(r,p,at);}
  for(const p of r.players)if(!p.out&&now-p.last>30000){p.out=true;p.outAt=now;}
- if(now>=r.end||r.players.filter(p=>!p.out).length<=1)finishBlocks(r);
+ if(now>=r.end||r.players.filter(p=>!p.out).length<=(r.practice?0:1))finishBlocks(r);
 }
 export function pauseBlocks(r:BlockRoom,now:number,paused:boolean){if(r.phase!=='playing')return;if(paused&&!r.paused)r.paused=now;else if(!paused&&r.paused){const delta=now-r.paused;r.end+=delta;r.start+=delta;r.players.forEach(p=>{p.fallAt+=delta;p.incomingAt+=delta;p.last=now;});r.paused=0;}}
 export function publicBlocks(r:BlockRoom){return {...r,players:r.players.map(({token,...p})=>p)};}
 export function boardCells(p:BlockPlayer,ghost=true){const board=[...p.board];if(p.out)return board;let landing={...p.piece};while(fits(p,{...landing,y:landing.y+1}))landing.y++;if(ghost)for(const [x,y] of cells(landing))if(y>=0&&y<ROWS&&!board[y*COLS+x])board[y*COLS+x]=-1;for(const [x,y] of cells(p.piece))if(y>=0&&y<ROWS)board[y*COLS+x]=p.piece.kind+1;return board;}
+
+export function makeBlockPractice(name:string,now:number,seed:number){const r=makeBlockRoom('연습',makeBlockPlayer('practice',name,now,seed),false);r.practice=true;startBlocks(r,now,seed);return r;}

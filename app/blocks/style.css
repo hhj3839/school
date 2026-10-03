@@ -4,3 +4,5 @@
 @media(max-height:650px) and (min-width:651px){.blocks-top{height:52px}.blocks-matchbar{margin:4px auto;height:42px}.block-board{height:49dvh}.mini-board{height:28dvh}.blocks-controls{margin-top:12px}.blocks-page .block-control{min-height:62px}.blocks-stats{gap:4px}.blocks-stats>strong{font-size:21px;margin-bottom:6px}.blocks-stats>svg{height:42px;margin-bottom:5px}.blocks-bottom-hint{margin-top:5px}.blocks-lobby{margin-top:22px}}
 
 .blocks-top{padding-right:90px}@media(max-width:650px){.blocks-room .blocks-top>strong{display:none}.blocks-top{padding-right:80px}}
+
+.blocks-practice-help{max-width:270px;padding:24px;background:#203444;border:1px solid #4a6374;border-radius:18px;line-height:1.8}.blocks-practice-help p{font-size:15px;color:#c4d6e2;margin:18px 0}.blocks-practice-help small{color:#a4bdcf}@media(max-width:650px){.blocks-practice-help{display:none}}
