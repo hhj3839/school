@@ -31,6 +31,13 @@ export function createCover(theme:string,scale:number):Cover[]{
  const colors:Record<string,string[]>={art:['#536882','#f0bd4c','#ed5353','#68875d'],amusement:['#ed5353','#f0bd4c','#569be0','#b377ce'],forest:['#3d5d42','#68875d','#78532f','#789568'],ocean:['#689399','#b377ce','#eb89ac','#3d666e'],museum:['#ad8051','#d2c1a3','#536882','#68875d']};
  const palette=colors[theme]||colors.art;
  function add(x:number,y:number,w:number,h:number,base:number,height:number,color:string,kind:string){out.push({x:x*scale,y:y*scale,w:w*scale,h:h*scale,base,height,color,kind});}
+ for(const [i,x] of [340,690,1010].entries()){
+  const base=[.35,3.65,7.7][i];add(x,65,150,8,base,2.5,palette[0],'camo-panel');
+  if(theme==='art'||theme==='amusement'){for(let j=0;j<5;j++)add(x+j*30,74,12,2,base,2.5,palette[1+j%2],'camo-stripe');}
+  else if(theme==='forest'){for(let j=0;j<6;j++){add(x+8+j*23,74,10,2,base,2.5,palette[2],'camo-bark');add(x+j*22,77,30,4,base+(j%3)*.7,.7,palette[1],'leaves');}}
+  else if(theme==='ocean'){for(let j=0;j<5;j++)add(x,74,150,2,base+j*.5,.16,palette[1+j%2],'camo-wave');}
+  else{for(let row=0;row<4;row++)for(let col=0;col<5;col++)add(x+col*30,74,26,2,base+row*.62,.54,palette[(row+col)%3],'camo-mosaic');}
+ }
  // Three heights on all four walls, with broad simple colours to paint against.
  for(const base of [.35,3.65,7.7])for(let i=0;i<3;i++){
   const c=palette[(i+Math.round(base))%4],kind=theme==='forest'?'wall-leaves':theme==='ocean'?'wall-reef':theme==='museum'?'wall-exhibit':'wall-banner';

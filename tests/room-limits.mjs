@@ -3,7 +3,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {registerHooks} from 'node:module';
 import {readFileSync} from 'node:fs';
 const sql=new DatabaseSync(':memory:');let testNow=2000000000000;Date.now=()=>testNow;let batchQueue=Promise.resolve();
-for(const file of ['0000_high_roulette.sql','0001_marvelous_psynapse.sql','0002_majestic_captain_universe.sql','0003_moaning_dakota_north.sql'])sql.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
+for(const file of ['0000_high_roulette.sql','0001_marvelous_psynapse.sql','0002_majestic_captain_universe.sql','0003_moaning_dakota_north.sql','0004_lovely_captain_universe.sql'])sql.exec(readFileSync(new URL('../drizzle/'+file,import.meta.url),'utf8'));
+sql.exec('UPDATE classroom SET student_create=1');
 globalThis.__testEnv={TEACHER_KEY:'test-only-secret',DB:{
  prepare(query){let values=[];return {bind(...args){values=args;return this;},async first(){return sql.prepare(query).get(...values)||null;},async all(){return {results:sql.prepare(query).all(...values)};},async run(){return {meta:sql.prepare(query).run(...values)};}};},
  batch(statements){const job=batchQueue.then(async()=>{sql.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}});batchQueue=job.catch(()=>{});return job;}

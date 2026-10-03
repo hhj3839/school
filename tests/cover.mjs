@@ -5,7 +5,7 @@ for(const {id} of MAPS){
  const all=mapCover(id);
  assert.ok(all.filter(o=>o.kind.startsWith('wall')).length>=36);
  for(const o of all){assert.ok(o.base>=0&&o.height>0&&o.base+o.height<=CEILING_HEIGHT);assert.ok(o.x>0&&o.y>0&&o.x+o.w<W&&o.y+o.h<H);}
- const o=all.find(o=>!o.kind.startsWith('wall'));
+ const o=all.find(o=>!o.kind.startsWith('wall')&&o.base>=3);
  const x=o.x+o.w/2,y=o.y+o.h/2;
  assert.ok(canStand(x,y,id,0),'walk underneath '+id);
  assert.equal(canStand(x,y,id,o.base),false,'cannot enter decoration '+id);

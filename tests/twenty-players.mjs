@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 const base='http://127.0.0.1:5173';
 const sessions=[];
-async function call(action,extra={},session={}){const r=await fetch(base+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:base},body:JSON.stringify({...session,action,...extra})});return {status:r.status,...await r.json()};}
+async function call(action,extra={},session={}){const r=await fetch(base+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:base,...(action==='create'&&process.env.TEACHER_KEY?{Authorization:'Bearer '+process.env.TEACHER_KEY}:{})},body:JSON.stringify({...session,action,...extra})});return {status:r.status,...await r.json()};}
 const settings={paintSeconds:60,hideSeconds:0,seekSeconds:120,maxPlayers:20,seekerCount:3};
 try{
  const host=await call('create',{name:'20명 테스트',settings});assert.equal(host.status,200);sessions.push({code:host.room.code,token:host.token,id:host.id});

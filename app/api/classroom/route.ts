@@ -1,5 +1,5 @@
 import {MAX_ROOMS,ROOM_IDLE_MS,cleanIdleRooms} from '../../room-limits';
-import { env } from 'cloudflare:workers';
+import {authorizedTeacher} from '../../teacher-auth';
 import { database } from '../../../db/raw';
 import {teacherRoomSummary} from '../../teaching';
 import {advance,mapName,roomSettings,type Room} from '../../game';
@@ -7,18 +7,12 @@ import { classroomState } from '../../classroom';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
 export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room;advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,mapName:mapName(roomSettings(r).mapId),count,capacity:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<roomSettings(r).maxPlayers};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
-async function authorized(req:Request){
-  const secret=(env as unknown as {TEACHER_KEY?:string}).TEACHER_KEY;
-  const key=req.headers.get('authorization')?.replace(/^Bearer /,'');
-  if(!secret||!key||key.length>200)return false;
-  const hash=async(s:string)=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));
-  const [a,b]=await Promise.all([hash(secret),hash(key)]);let difference=0;for(let i=0;i<a.length;i++)difference|=a[i]^b[i];return difference===0;
-}
 export async function POST(req:Request){try{
   if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'허용되지 않은 요청이에요.'},403);
-  if(!await authorized(req))return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
+  if(!await authorizedTeacher(req))return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
   const raw=await req.text();if(raw.length>100)return reply({error:'잘못된 요청이에요.'},400);
   const {action,code}=JSON.parse(raw);
+  if(action==='allowStudentRooms'||action==='restrictStudentRooms'){await database().prepare('UPDATE classroom SET student_create=? WHERE id=1').bind(action==='allowStudentRooms'?1:0).run();return reply(await classroomState());}
   if(action==='check')return reply(await classroomState());
   if(action==='status'){
     const now=Date.now(),db=database();await cleanIdleRooms(now);const rows=await db.prepare('SELECT state FROM rooms WHERE expires>? ORDER BY version DESC').bind(now).all<{state:string}>();
@@ -40,7 +34,7 @@ export async function POST(req:Request){try{
       if(['lobby','result'].includes(room.phase))return reply({error:'진행 중인 판에서 사용할 수 있어요.'},409);
       if(action==='endRoom'){room.phase='result';room.end=0;room.paused=0;room.winner='선생님이 이번 판을 마쳤어요';}
       else if(action==='pauseRoom'&&!room.paused)room.paused=now;
-      else if(action==='resumeRoom'&&room.paused){room.end+=now-room.paused;room.paused=0;room.players.forEach(p=>p.moveAt=now);}
+      else if(action==='resumeRoom'&&room.paused){room.end+=now-room.paused;room.players.forEach(p=>{p.moveAt=now;if(p.reloadUntil)p.reloadUntil+=now-room.paused;});room.paused=0;}
       const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1 WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(room),code,row.version,now,gate.revision).run();
       if(saved.meta.changes)return reply({room:teacherRoomSummary(room,now)});
     }

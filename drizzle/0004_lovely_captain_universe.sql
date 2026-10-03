@@ -1,0 +1,1 @@
+ALTER TABLE `classroom` ADD `student_create` integer DEFAULT 0 NOT NULL;
