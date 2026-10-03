@@ -17,7 +17,7 @@ export const BELTS=STAGES.flatMap((s,i)=>[{z:s+72,d:7,dir:i%2?-1:1},{z:s+146,d:6
 export const BOUNCERS=STAGES.flatMap(s=>[80,166].map(z=>s+z));
 export const gateAngle=(time:number,z:number)=>time*1.05+z;
 export function pendulum(time:number,z:number){const x=Math.sin(time*2.0+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
-export function courseHint(z:number){const section=Math.min(4,Math.floor(z/220)+1),local=z%220,prefix=`${section}/4 구간 · `;if(NARROWS.some(n=>z>n.start-5&&z<n.end))return prefix+'좁은 커브! 가운데로 달리고 끊긴 길은 점프!';if(GAPS.some(([a,b])=>z>a-8&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-8&&z<b)?'움직이는 보라 발판을 따라가요':'끊긴 길! 가장자리 직전에 점프!');const turn=upcomingTurn(z);if(turn)return prefix+turn.label+' · 카메라는 자동으로 돌아요';if(local<16)return prefix+'높은 벽은 옆으로 피해요';if(local<34)return prefix+'회전 막대와 흔들리는 공을 조심!';if(local<84)return prefix+'움직이는 벽과 밀리는 바닥!';if(local<140)return prefix+'회전문이 열릴 때 달려요!';if(local<170)return prefix+'움직이는 발판 다음은 흔들리는 공!';return prefix+'연속 장치를 통과해요!';}
+export function courseHint(z:number){const section=Math.min(4,Math.floor(z/220)+1),local=z%220,prefix=`${section}/4 구간 · `;if(NARROWS.some(n=>z>n.start-5&&z<n.end))return prefix+'좁은 커브! 가운데로 달리고 끊긴 길은 점프!';if(GAPS.some(([a,b])=>z>a-8&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-8&&z<b)?'움직이는 보라 발판을 따라가요':'끊긴 길! 가장자리 직전에 점프!');const turn=upcomingTurn(z);if(turn)return prefix+turn.label+' · 카메라는 자동으로 돌아요';if(local<16)return prefix+'높은 벽은 옆으로 피해요';if(local<34)return prefix+'회전 장애물은 점프 말고 옆으로 피해요!';if(local<84)return prefix+'움직이는 벽과 밀리는 바닥!';if(local<140)return prefix+'회전 장애물의 빈틈을 보고 피해 가요!';if(local<170)return prefix+'움직이는 발판 다음은 흔들리는 공!';return prefix+'연속 장치를 통과해요!';}
 
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
@@ -52,7 +52,7 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  }
  for(const z of GATES){const a=gateAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<5.9&&Math.abs(across)<.7&&p.y<WALL_HEIGHT){p.x=ox;p.z=oz<=z?Math.min(oz,z-1.1):Math.max(oz,z+1.1);}}
  for(const z of PENDULUMS){const ball=pendulum(t,z);if(Math.hypot(p.x-ball.x,p.z-z)<1.7&&Math.abs(p.y+.9-ball.y)<2&&at>=p.stun){p.x+=(p.x>=ball.x?1:-1)*1.7;p.z-=1.2;p.vy=4;p.stun=at+650;}}
- for(const z of SPINNERS){const a=spinnerAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<6&&Math.abs(across)<.7&&p.y<1.05&&at>=p.stun){p.stun=at+600;p.z-=1.8;p.vy=3;}}
+ for(const z of SPINNERS){const a=spinnerAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<6&&Math.abs(across)<.7&&p.y<WALL_HEIGHT&&p.y> -2&&at>=p.stun){p.stun=at+600;p.z-=1.8;p.vy=3;}}
  if(BOUNCERS.some(z=>Math.abs(p.z-z)<1.4)&&Math.abs(p.x)<2.4&&p.y===0&&at>p.bounce){p.vy=12;p.bounce=at+1400;}
  if(p.y< -5){p.x=0;p.z=START;p.y=0;p.vy=0;p.checkpoint=0;p.falls++;p.stun=at+200;p.bounce=0;}
  if(p.y>=0&&ground(p.x,p.z,t)){p.peak=Math.max(p.peak,Math.min(FINISH,p.z));}

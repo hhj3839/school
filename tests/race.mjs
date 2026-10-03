@@ -50,12 +50,15 @@ for(let i=0;i<engine.DURATION/engine.STEP&&!p.finished;i++){
  if(nextWall&&nextWall.z-p.z<8)target=nextWall.x<0?5:-5;
  for(const z of engine.GATES)if(p.z>z-7&&p.z<z+5)target=5;
  if(engine.RAFTS.some(([a,b])=>p.z>a-5&&p.z<b+2))target=engine.platformX(engine.raceTime(r,at));
- let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a)||engine.SPINNERS.some(z=>Math.abs(z-p.z)<6);
+ for(const z of engine.SPINNERS)if(p.z>z-6.5&&p.z<z+6.5)target=6.4;
+ let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a);
  const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
 }
 assert.ok(p.finished,'course is traversable within the round time: '+JSON.stringify({z:p.z,x:p.x,peak:p.peak,falls:p.falls}));assert.equal(r.phase,'result');
 const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=2;q.x=10;q.z=102;q.y=-4.9;q.vy=-5;engine.stepRacer(f,q,{seq:1,x:0,z:0,jump:false},f.start+50);assert.equal(q.z,engine.START);assert.equal(q.checkpoint,0);assert.equal(q.falls,1);
 // Neither normal jumps nor bounce-pad height can clear a tall wall.
+for(const height of [0,2.2,3.8]){const r=engine.practiceRace('회전 장애물',clock),p=r.players[0];p.z=engine.SPINNERS[0];p.y=height;engine.stepRacer(r,p,{seq:1,x:0,z:0,jump:height===0},r.start+50);assert.ok(p.stun>r.start+50,'rotating barrier hits at ground, normal jump and bounce height');}
+{const r=engine.practiceRace('옆으로 피하기',clock),p=r.players[0];p.x=6.4;p.z=engine.SPINNERS[0];engine.stepRacer(r,p,{seq:1,x:0,z:0,jump:false},r.start+50);assert.equal(p.stun,0,'outer lane avoids rotating barrier without a jump');}
 for(const vy of [9,12]){const wall=engine.WALLS[0],r=engine.practiceRace('벽 점프',clock),p=r.players[0];p.x=wall.x;p.z=wall.z-2;p.vy=vy;let maxY=0;for(let i=1;i<=30;i++){engine.stepRacer(r,p,{seq:i,x:0,z:1,jump:true},r.start+i*50);maxY=Math.max(maxY,p.y);assert.ok(p.z<wall.z-1,'wall cannot be jumped through');}assert.ok(maxY<engine.WALL_HEIGHT);}
 const moving=engine.practiceRace('움직이는 벽',clock),runner=moving.players[0],mz=engine.MOVERS[0];runner.x=engine.moverX(.05,mz);runner.z=mz-1.2;runner.y=2;engine.stepRacer(moving,runner,{seq:1,x:0,z:1,jump:false},moving.start+50);assert.ok(runner.z<mz-1,'moving wall collision uses rendered position');
 const belt=engine.practiceRace('바닥',clock),bp=belt.players[0];bp.z=engine.BELTS[0].z;engine.stepRacer(belt,bp,{seq:1,x:0,z:0,jump:false},belt.start+50);assert.ok(bp.x>0,'conveyor pushes sideways');
