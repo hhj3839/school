@@ -5,7 +5,9 @@ export const STAGES=[0,220,440,660];
 // Four identical sectors, each turning 90 degrees, close the circuit exactly.
 export const TURNS=STAGES.flatMap(offset=>[[34,58],[104,128],[170,194]].map(([a,b])=>({start:offset+a,end:offset+b,angle:Math.PI/6,label:'왼쪽 커브'})));
 export const CHECKPOINTS=[110,220,330,440,550,660,770];
-export const NARROWS=STAGES.map((offset,i)=>({start:offset+173,end:offset+194,halfWidth:2.8-i*.3}));
+export const SECTORS=[{start:0,end:220,name:'회전문 피하기',color:'#e6dcfa'},{start:220,end:440,name:'발판과 점프',color:'#fff0b5'},{start:440,end:660,name:'좁은 다리',color:'#cceee1'},{start:660,end:880,name:'마지막 질주',color:'#ffdccd'}];
+export function courseSector(z:number){return SECTORS[Math.min(3,Math.max(0,Math.floor(z/220)))];}
+export const NARROWS=[{start:470,end:530,halfWidth:2.8},{start:560,end:625,halfWidth:2},{start:825,end:854,halfWidth:2.5}];
 export function trackHalfWidth(z:number){return NARROWS.find(n=>z>=n.start&&z<=n.end)?.halfWidth??7;}
 export function coursePoint(offset:number,distance:number){
  distance=((distance%COURSE_LENGTH)+COURSE_LENGTH)%COURSE_LENGTH;

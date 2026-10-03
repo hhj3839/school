@@ -8,3 +8,5 @@
 @media(max-width:700px){.race-seats{grid-template-columns:repeat(2,minmax(0,1fr))}.race-leaders{font-size:12px;max-width:90%}}
 
 .race-course-map{position:absolute;right:20px;top:138px;width:138px;padding:7px;background:#fffdf0e8;border:1px solid #dfd9bb;border-radius:15px;z-index:3;pointer-events:none}.race-course-map span{display:block;text-align:center;font-size:12px;font-weight:700;color:#46685f}.race-course-map svg{display:block;width:100%;height:auto}@media(max-width:700px){.race-course-map{right:10px;top:130px;width:100px}.race-course-map span{font-size:10px}}@media(orientation:landscape) and (max-height:650px){.race-course-map{width:116px;top:138px}}
+
+.race-sector{position:absolute;top:138px;left:20px;max-width:40%;padding:8px 12px;border:1px solid #ffffff;border-radius:14px;font-size:13px;font-weight:800;pointer-events:none}.racer-label.recovering{background:#e9fff4;border:3px solid #5ccba5;box-shadow:0 0 20px #8affd9;display:flex;flex-direction:column;align-items:center;padding:8px 14px}.racer-label.recovering b{display:block;text-align:center;font-size:40px;line-height:1.1;color:#24715d}.racer-label.recovering small{font-size:12px}

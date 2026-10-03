@@ -1,25 +1,25 @@
-import {COURSE_LENGTH,CHECKPOINTS,STAGES,NARROWS,trackHalfWidth,courseSpeedScale,upcomingTurn} from './course';
+import {COURSE_LENGTH,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
 export const FINISH=COURSE_LENGTH,STEP=50,DURATION=480000,CAPACITY=20;
 export const SPEED=13.5;
-export const RAFT=[151,159];
-export const RAFTS=STAGES.map(s=>[s+151,s+159]);
-export const GAPS=STAGES.flatMap(s=>[[s+45,s+52],[s+113,s+120],[s+151,s+159],[s+181,s+187]]);
+export const RAFTS=[[265,277],[337,349],[389,401]];
+export const RAFT=RAFTS[0];
+export const GAPS=[...RAFTS,[305,312],[423,430],[499,506],[590,597],[741,748],[839,846]].sort((a,b)=>a[0]-b[0]);
+export const JUMP_ZONES=GAPS.filter(([a])=>!RAFTS.some(([r])=>r===a)).map(([a])=>a-2);
 export const START=0;
 export const RESPAWN_DELAY=3000;
 export const WALL_HEIGHT=5;
-export const SPINNERS=STAGES.flatMap(s=>[20,96,134,206].map(z=>s+z)).filter(z=>z<FINISH-30);
-export const MOVERS=STAGES.flatMap(s=>[64,142].map(z=>s+z));
+export const SPINNERS=[20,64,112,158,196,726,812];
+export const MOVERS=[692,790];
 export const moverX=(time:number,z:number)=>Math.sin(time*1.6+z)*4;
 export const spinnerAngle=(time:number,z:number)=>time*2.7+z;
-export const WALLS=STAGES.flatMap((s,i)=>[{x:i%2?4:-4,z:s+12,w:6},{x:i%2?-3:3,z:s+215,w:7}]).filter(w=>w.z<FINISH-30);
-export const GATES=STAGES.flatMap(s=>[88,202].map(z=>s+z)).filter(z=>z<FINISH-30);
-export const PENDULUMS=STAGES.flatMap(s=>[28,163,209].map(z=>s+z)).filter(z=>z<FINISH-30);
-export const BELTS=STAGES.flatMap((s,i)=>[{z:s+72,d:7,dir:i%2?-1:1},{z:s+146,d:6,dir:-1},{z:s+196,d:4,dir:1}]).filter(b=>b.z<FINISH-30);
-export const BOUNCERS=STAGES.flatMap(s=>[80,166].map(z=>s+z));
+export const WALLS=[{x:-4,z:12,w:6},{x:4,z:672,w:6}];
+export const GATES=[88,136,180,762];
+export const PENDULUMS=[450,544,640];
+export const BELTS=[{z:552,d:6,dir:1},{z:702,d:7,dir:-1},{z:780,d:6,dir:1}];
+export const BOUNCERS=[295,377,832];
 export const gateAngle=(time:number,z:number)=>time*1.05+z;
 export function pendulum(time:number,z:number){const x=Math.sin(time*2.0+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
-export function courseHint(z:number){if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';const section=Math.min(4,Math.floor(z/220)+1),local=z%220,prefix=`${section}/4 구간 · `;if(NARROWS.some(n=>z>n.start-5&&z<n.end))return prefix+'좁은 커브! 가운데로 달리고 끊긴 길은 점프!';if(GAPS.some(([a,b])=>z>a-8&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-8&&z<b)?'움직이는 보라 발판을 따라가요':'끊긴 길! 가장자리 직전에 점프!');const turn=upcomingTurn(z);if(turn)return prefix+turn.label+' · 카메라는 자동으로 돌아요';if(local<16)return prefix+'높은 벽은 옆으로 피해요';if(local<34)return prefix+'회전 장애물은 점프 말고 옆으로 피해요!';if(local<84)return prefix+'움직이는 벽과 밀리는 바닥!';if(local<140)return prefix+'회전 장애물의 빈틈을 보고 피해 가요!';if(local<170)return prefix+'움직이는 발판 다음은 흔들리는 공!';return prefix+'연속 장치를 통과해요!';}
-
+export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<220)return prefix+'회전 장애물은 옆으로 피하거나 기다려요';if(z<440)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<660)return prefix+'흔들리는 공을 피하고 좁은 길 가운데로!';return prefix+'움직이는 장치를 피하고 결승선까지!';}
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
