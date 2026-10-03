@@ -1,0 +1,17 @@
+import './resolve-ts.mjs';
+import assert from 'node:assert/strict';
+const {makePlayer,makeRoom,publicRoom,MAP_SCALE,DEFAULT_SETTINGS}=await import('../app/game.ts');
+const {shotTarget,validAim,visibleTo}=await import('../app/server-vision.ts');
+const {pollDelay}=await import('../app/network-policy.ts');
+const a=makePlayer('a','술래',10000),b=makePlayer('b','친구',10000),c=makePlayer('c','관전자',10000),r=makeRoom('TEST22',a);r.settings={...DEFAULT_SETTINGS};r.players.push(b,c);r.phase='seek';r.end=90000;a.role='seeker';c.caught=true;
+a.x=800;a.y=700*MAP_SCALE;a.viewYaw=-Math.PI/2;a.viewPitch=0;b.x=1100;b.y=a.y;b.angle=0;c.x=600;c.y=a.y;
+assert.equal(shotTarget(r,a,{yaw:-Math.PI/2,pitch:0}),'b','server ray hits visible head');
+assert.equal(shotTarget(r,a,{yaw:Math.PI/2,pitch:0}),'','backwards shot cannot use supplied target');
+assert.equal(visibleTo(r,a,b),true);a.viewYaw=Math.PI/2;assert.equal(visibleTo(r,a,b),false);
+let wire=publicRoom(r,c.id,(v,t)=>visibleTo(r,v,t),'b');assert.equal(wire.players.find(p=>p.id==='b').hidden,true,'hider watch target cannot grant vision');assert.equal(wire.players.find(p=>p.id==='b').x,0);assert.equal(wire.players.find(p=>p.id==='b').elevation,0);
+a.viewYaw=-Math.PI/2;assert.equal(publicRoom(r,c.id,(v,t)=>visibleTo(r,v,t),'a').players.find(p=>p.id==='b').hidden,false);
+a.x=240*MAP_SCALE;a.y=200*MAP_SCALE;b.x=330*MAP_SCALE;b.y=a.y;
+assert.equal(shotTarget(r,a,{yaw:-Math.PI/2,pitch:0}),'','wall blocks the ray');assert.equal(visibleTo(r,a,b),false,'wall hides position payload');
+assert.equal(validAim({yaw:Infinity,pitch:0}),false);assert.equal(validAim({yaw:0,pitch:2}),false);assert.equal(validAim({yaw:0,pitch:0}),true);
+assert.equal(pollDelay(r,a,true,false),300);assert.equal(pollDelay({...r,phase:'lobby'},a,false,false),1500);assert.equal(pollDelay(r,b,false,false),1000);assert.equal(pollDelay(r,a,false,false,true),5000);
+console.log('PASS: ray aim, backwards miss, cover occlusion, visibility redaction, invalid spectator target, aim validation, adaptive polling');

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {coverShape,type Cover,type SolidShape} from './cover-layout';
 
-function geometry(shape:SolidShape){
+export function geometry(shape:SolidShape){
  if(shape==='ellipsoid')return new THREE.SphereGeometry(1,16,10);
  if(shape==='cylinder')return new THREE.CylinderGeometry(1,1,2,16);
  if(shape==='ring'||shape==='wheelRing'){

@@ -17,6 +17,10 @@ const play=(action,data={})=>call(room.POST,'room',{action,...data});
 assert.equal((await classroom.GET()).status,200);
 const created=await play('create',{name:'학생'});assert.equal(created.status,200);
 const session={code:created.room.code,token:created.token};
+const versionBefore=sql.prepare('SELECT version FROM rooms WHERE code=?').get(session.code).version;
+for(let i=0;i<10;i++)assert.equal((await play('state',session)).status,200);
+assert.equal(sql.prepare('SELECT version FROM rooms WHERE code=?').get(session.code).version,versionBefore,'idle polling must not rewrite the room');
+
 
 assert.equal((await control('status','wrong')).status,401);
 assert.equal((await control('status','test-only-secret','https://other.example')).status,403);

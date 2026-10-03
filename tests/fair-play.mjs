@@ -34,12 +34,12 @@ assert.equal((await play('state',{code:other.room.code,token:other.token})).stat
 let now=Date.now();const realNow=Date.now;Date.now=()=>now;
 try{
  await play('next',session);await play('next',session);
- for(let i=0;i<3;i++){const shot=await play('catch',{...session,target:''});assert.equal(shot.status,200);now+=800;}
- assert.equal((await play('catch',{...session,target:''})).status,409,'fourth shot rejected by server');
+ for(let i=0;i<3;i++){const shot=await play('catch',{...session,target:'',aim:{yaw:0,pitch:0}});assert.equal(shot.status,200);now+=800;}
+ assert.equal((await play('catch',{...session,target:'',aim:{yaw:0,pitch:0}})).status,409,'fourth shot rejected by server');
  const before=(await play('state',session)).room.players.find(p=>p.id===teacher.id);assert.ok(ammunition(before,now).wait>0);
  await play('pause',session);now+=5000;await play('pause',session);
- assert.equal((await play('catch',{...session,target:''})).status,409,'pause does not refill ammunition');
- now+=3000;assert.equal((await play('catch',{...session,target:''})).status,200);
+ assert.equal((await play('catch',{...session,target:'',aim:{yaw:0,pitch:0}})).status,409,'pause does not refill ammunition');
+ now+=3000;assert.equal((await play('catch',{...session,target:'',aim:{yaw:0,pitch:0}})).status,200);
  const tick=await play('tick',{...session,viewYaw:1.2,viewPitch:50,dx:0,dy:0});assert.equal(tick.room.players.find(p=>p.id===teacher.id).viewYaw,1.2);assert.equal(tick.room.players.find(p=>p.id===teacher.id).viewPitch,.95);
  const r=tick.room;r.end=now+29000;const hint=finalHint(r,now);assert.ok(hint);assert.deepEqual(Object.keys(hint).sort(),['x','y','z']);
  assert.equal(finalHint({...r,end:now+31000},now),null);assert.equal(finalHint({...r,end:now+25000},now),null);assert.equal(finalHint({...r,paused:now},now),null);assert.equal(finalHint({...r,phase:'result'},now),null);
