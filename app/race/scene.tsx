@@ -1,8 +1,8 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import * as THREE from 'three';
-import {coursePoint,TURNS} from './course';
-import {START,RAFT,WALL_HEIGHT,GATES,PENDULUMS,BELTS,BOUNCERS,gateAngle,pendulum,MOVERS,moverX,spinnerAngle,FINISH,GAPS,SPINNERS,WALLS,PALETTE,platformX,raceTime,type RaceRoom} from './engine';
+import {coursePoint,TURNS,NARROWS,trackHalfWidth} from './course';
+import {START,RAFTS,WALL_HEIGHT,GATES,PENDULUMS,BELTS,BOUNCERS,gateAngle,pendulum,MOVERS,moverX,spinnerAngle,FINISH,GAPS,SPINNERS,WALLS,PALETTE,platformX,raceTime,type RaceRoom} from './engine';
 export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  const host=useRef<HTMLDivElement>(null),live=useRef({room,id,now}),[failed,setFailed]=useState(false);live.current={room,id,now};
  useEffect(()=>{const el=host.current!;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});}catch{setFailed(true);return;}
@@ -13,14 +13,14 @@ export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  function place(o:THREE.Object3D,x:number,y:number,z:number){const p=coursePoint(x,z);o.position.set(p.x,y,p.z);o.rotation.y=p.heading;}
  const geometries:THREE.BufferGeometry[]=[];function box(x:number,y:number,z:number,w:number,h:number,d:number,c:string,parent:THREE.Object3D=scene){const g=new THREE.BoxGeometry(w,h,d);geometries.push(g);const m=new THREE.Mesh(g,mat(c));if(parent===scene)place(m,x,y,z);else m.position.set(x,y,z);parent.add(m);return m;}
  function sphere(x:number,y:number,z:number,r:number,c:string,parent:THREE.Object3D){const g=new THREE.SphereGeometry(r,12,8);geometries.push(g);const m=new THREE.Mesh(g,mat(c));if(parent===scene)place(m,x,y,z);else m.position.set(x,y,z);parent.add(m);return m;}
- box(0,-6,80,350,.3,340,'#6bbfd6');
+ const water=box(0,-6,0,2200,.3,2200,'#6bbfd6');water.position.set(300,-6,300);
  function ribbon(a:number,b:number,left:number,right:number,low:number,high:number,color:string){const vertices:number[]=[];const quad=(v:number[][])=>{for(const i of [0,1,2,0,2,3])vertices.push(...v[i]);};const point=(x:number,y:number,z:number)=>{const p=coursePoint(x,z);return [p.x,y,p.z];};const n=Math.ceil(b-a);for(let i=0;i<n;i++){const z0=a+(b-a)*i/n,z1=a+(b-a)*(i+1)/n,l0=point(left,high,z0),r0=point(right,high,z0),l1=point(left,high,z1),r1=point(right,high,z1),lb0=point(left,low,z0),rb0=point(right,low,z0),lb1=point(left,low,z1),rb1=point(right,low,z1);quad([l0,l1,r1,r0]);quad([rb0,rb1,lb1,lb0]);quad([lb0,lb1,l1,l0]);quad([r0,r1,rb1,rb0]);if(i===0)quad([r0,rb0,lb0,l0]);if(i===n-1)quad([l1,lb1,rb1,r1]);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();geometries.push(g);scene.add(new THREE.Mesh(g,mat(color)));}
- const segments=[[-3,GAPS[0][0]],[GAPS[0][1],GAPS[1][0]],[GAPS[1][1],RAFT[0]],[RAFT[1],FINISH+8]];
- for(const [a,b] of segments){ribbon(a,b,-7,7,-1.2,0,'#ffe4ac');ribbon(a,b,-7,-6.7,0,.2,'#f6b39a');ribbon(a,b,6.7,7,0,.2,'#f6b39a');for(let z=a+1;z<b;z+=3)box(0,.008,z,13.6,.015,.06,'#e8c991');}
+ const boundaries=[...new Set([-3,FINISH+8,...GAPS.flat(),...NARROWS.flatMap(n=>[n.start,n.end])])].sort((a,b)=>a-b);
+ for(let i=0;i<boundaries.length-1;i++){const a=boundaries[i],b=boundaries[i+1],mid=(a+b)/2;if(GAPS.some(([lo,hi])=>mid>lo&&mid<hi))continue;const w=trackHalfWidth(mid);ribbon(a,b,-w,w,-1.2,0,w<7?'#ffcf96':'#ffe4ac');ribbon(a,b,-w,-w+.3,0,.2,'#f6b39a');ribbon(a,b,w-.3,w,0,.2,'#f6b39a');for(let z=a+1;z<b;z+=4)box(0,.008,z,w*2-.4,.015,.06,'#e8c991');}
  // Direction chevrons are part of the track, including the approach to each bend.
  for(const turn of TURNS){for(let z=turn.start-4;z<turn.end;z+=6){if(GAPS.some(([a,b])=>z>a&&z<b))continue;const left=box(-.45,.04,z,.2,.05,1.3,'#fffdf0'),right=box(.45,.04,z,.2,.05,1.3,'#fffdf0');left.rotation.y+=.7;right.rotation.y-=.7;}const sign=new THREE.Group();place(sign,-8,0,turn.start-3);scene.add(sign);box(0,1.3,0,.18,2.6,.18,'#fffdf0',sign);box(0,2.6,0,2.4,1.4,.15,'#65b7c7',sign);box(0,2.6,-.1,1.5,.15,.08,'#fffdf0',sign);const tip=box(turn.angle>0?.6:-.6,2.6,-.1,.6,.6,.08,'#fffdf0',sign);tip.rotation.z=Math.PI/4;}
- for(const [a,b] of GAPS){box(0,.015,a-.3,14,.04,.4,'#f593a2');box(0,.015,b+.3,14,.04,.4,'#f593a2');}
- const raftZ=(RAFT[0]+RAFT[1])/2,raft=box(0,-.35,raftZ,5.6,.7,RAFT[1]-RAFT[0]+.2,'#9a91df');for(let z=-3;z<4;z+=2)box(0,.37,z,5.2,.04,.18,'#d4cef4',raft);
+ for(const [a,b] of GAPS){box(0,.015,a-.3,trackHalfWidth(a-.3)*2,.04,.4,'#f593a2');box(0,.015,b+.3,trackHalfWidth(b+.3)*2,.04,.4,'#f593a2');}
+ const rafts=RAFTS.map(([a,b])=>{const z=(a+b)/2,mesh=box(0,-.35,z,5.6,.7,b-a+.2,'#9a91df');for(let dz=-3;dz<4;dz+=2)box(0,.37,dz,5.2,.04,.18,'#d4cef4',mesh);return {z,mesh};});
  function wall(x:number,z:number,w:number,moving=false){const group=new THREE.Group();place(group,x,0,z);scene.add(group);box(0,WALL_HEIGHT/2,0,w,WALL_HEIGHT,1.4,moving?'#9e92db':'#efa888',group);box(0,WALL_HEIGHT+.04,0,w,.08,1.4,moving?'#d9d2fc':'#ffe0c2',group);for(let y=.5;y<WALL_HEIGHT;y+=1)box(0,y,-.71,w,.12,.03,moving?'#c8bfee':'#ffcaac',group);return group;}
  WALLS.forEach(w=>wall(w.x,w.z,w.w));const movingWalls=MOVERS.map(z=>{box(0,.025,z,13,.05,1.6,'#d6caf1');return wall(0,z,5,true);});
  const doors=GATES.map(z=>{const g=new THREE.Group();place(g,0,0,z);scene.add(g);box(0,2.5,0,.4,5,.4,'#546f90',g);for(const x of [-3,3]){box(x,2.5,0,5.6,5,.4,'#71c9d2',g);box(x,2.5,-.23,5,.22,.04,'#defbfb',g);}return g;});
@@ -36,7 +36,7 @@ export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  function avatar(key:string,color:number){const a=new THREE.Group(),c=PALETTE[color%PALETTE.length];sphere(0,.9,0,.65,c,a);sphere(0,1.6,0,.55,c,a);sphere(-.22,1.7,.46,.105,'#344e59',a);sphere(.22,1.7,.46,.105,'#344e59',a);sphere(-.3,.23,0,.23,'#fff8e8',a);sphere(.3,.23,0,.23,'#fff8e8',a);box(0,1.05,-.51,.8,.6,.2,'#fff2bd',a);scene.add(a);avatars.set(key,a);return a;}
  let raf=0;const resize=()=>{const {width,height}=el.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/Math.max(1,height);camera.updateProjectionMatrix();};const observer=new ResizeObserver(resize);observer.observe(el);resize();
  const render=()=>{const {room:r,id,now}=live.current,t=raceTime(r,now),me=r.players.find(p=>p.id===id)||r.players[0];
-  beams.forEach((b,i)=>b.rotation.y=coursePoint(0,SPINNERS[i]).heading-spinnerAngle(t,SPINNERS[i]));place(raft,platformX(t),-.35,raftZ);movingWalls.forEach((w,i)=>place(w,moverX(t,MOVERS[i]),0,MOVERS[i]));
+  beams.forEach((b,i)=>b.rotation.y=coursePoint(0,SPINNERS[i]).heading-spinnerAngle(t,SPINNERS[i]));rafts.forEach(({z,mesh})=>place(mesh,platformX(t),-.35,z));movingWalls.forEach((w,i)=>place(w,moverX(t,MOVERS[i]),0,MOVERS[i]));
   doors.forEach((g,i)=>g.rotation.y=coursePoint(0,GATES[i]).heading-gateAngle(t,GATES[i]));
   swings.forEach(({ball,rope,z})=>{const p=pendulum(t,z);place(ball,p.x,p.y,z);const anchor=coursePoint(0,z),end=coursePoint(p.x,z);rope.position.set((anchor.x+end.x)/2,(p.y+7)/2,(anchor.z+end.z)/2);const delta=new THREE.Vector3(end.x-anchor.x,p.y-7,end.z-anchor.z);rope.scale.y=delta.length();rope.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());});
   belts.forEach(({b,stripes})=>stripes.forEach((s,i)=>place(s,((i*2+t*3.2*b.dir)%14+14)%14-7,.09,b.z)));
@@ -49,5 +49,5 @@ export function RaceScene({room,id,now}:{room:RaceRoom;id:string;now:number}){
  };raf=requestAnimationFrame(render);const lost=(e:Event)=>{e.preventDefault();setFailed(true);};renderer.domElement.addEventListener('webglcontextlost',lost);
  return()=>{cancelAnimationFrame(raf);observer.disconnect();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());renderer.dispose();renderer.domElement.remove();};
  },[]);
- return <div className="race-scene" ref={host} role="img" aria-label="세 개의 커브가 있는 바다 위 장애물 달리기 코스. 이동 패드와 점프 버튼으로 달려요.">{room.players.map(p=><span key={p.id} data-racer={p.id} className={'racer-label '+(p.id===id?'mine':'')}>{p.name}{p.id===id?' · 나':''}{p.finished?' ✓':''}</span>)}{failed&&<div className="race-overlay"><strong>게임 화면을 다시 열어 주세요</strong><p>3D 화면을 표시하지 못했어요. 나갔다가 다시 들어와 주세요.</p></div>}</div>;
+ return <div className="race-scene" ref={host} role="img" aria-label="열두 개의 커브와 좁은 다리가 있는 바다 위 장애물 달리기 코스. 이동 패드와 점프 버튼으로 달려요.">{room.players.map(p=><span key={p.id} data-racer={p.id} className={'racer-label '+(p.id===id?'mine':'')}>{p.name}{p.id===id?' · 나':''}{p.finished?' ✓':''}</span>)}{failed&&<div className="race-overlay"><strong>게임 화면을 다시 열어 주세요</strong><p>3D 화면을 표시하지 못했어요. 나갔다가 다시 들어와 주세요.</p></div>}</div>;
 }

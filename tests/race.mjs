@@ -30,7 +30,7 @@ const hide=await import('../app/api/room/route.ts'),blocks=await import('../app/
 assert.equal((await call(hide.POST,'room',{action:'state',...sessions[0]})).status,409);
 assert.equal((await call(blocks.POST,'blocks',{action:'state',...sessions[0]})).status,409);
 clock+=3400;const commands=Array.from({length:8},(_,i)=>({seq:i+1,x:0,z:1,jump:false}));
-d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.players[0].seq,8);const z=d.room.players[0].z;assert.ok(z>2&&z<=5.61);
+d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.players[0].seq,8);const z=d.room.players[0].z;assert.ok(z>2&&z<=2+engine.SPEED*.4+.01);
 d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.players[0].z,z,'retries cannot replay movement');
 d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].seq,8,'server time limits movement');
 assert.equal((await play('input',{...sessions[0],commands:[{seq:9,x:99,z:1,jump:false}]})).status,400);
@@ -44,16 +44,16 @@ assert.equal((await manage('deleteRoom')).status,200);assert.equal((await play('
 await control('close');assert.equal((await play('create',{name:'닫힘'})).status,423);await control('open');
 // Full course simulation, using the same movement and hazards as client/server.
 const r=engine.practiceRace('완주 연습',clock),p=r.players[0];let at=r.start;
-for(let i=0;i<3600&&!p.finished;i++){
+for(let i=0;i<engine.DURATION/engine.STEP&&!p.finished;i++){
  at+=50;p.last=at;let target=0;
  const nextWall=[...engine.WALLS,...engine.MOVERS.map(z=>({x:engine.moverX(engine.raceTime(r,at),z),z,w:5}))].filter(w=>w.z>p.z-1.1).sort((a,b)=>a.z-b.z)[0];
  if(nextWall&&nextWall.z-p.z<8)target=nextWall.x<0?5:-5;
  for(const z of engine.GATES)if(p.z>z-7&&p.z<z+5)target=5;
- if(p.z>engine.RAFT[0]-5&&p.z<engine.RAFT[1]+2)target=engine.platformX(engine.raceTime(r,at));
+ if(engine.RAFTS.some(([a,b])=>p.z>a-5&&p.z<b+2))target=engine.platformX(engine.raceTime(r,at));
  let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a)||engine.SPINNERS.some(z=>Math.abs(z-p.z)<6);
  const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
 }
-assert.ok(p.finished,'course is traversable within three minutes: '+JSON.stringify({z:p.z,x:p.x,peak:p.peak,falls:p.falls}));assert.equal(r.phase,'result');
+assert.ok(p.finished,'course is traversable within the round time: '+JSON.stringify({z:p.z,x:p.x,peak:p.peak,falls:p.falls}));assert.equal(r.phase,'result');
 const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=2;q.x=10;q.z=102;q.y=-4.9;q.vy=-5;engine.stepRacer(f,q,{seq:1,x:0,z:0,jump:false},f.start+50);assert.equal(q.z,engine.START);assert.equal(q.checkpoint,0);assert.equal(q.falls,1);
 // Neither normal jumps nor bounce-pad height can clear a tall wall.
 for(const vy of [9,12]){const wall=engine.WALLS[0],r=engine.practiceRace('벽 점프',clock),p=r.players[0];p.x=wall.x;p.z=wall.z-2;p.vy=vy;let maxY=0;for(let i=1;i<=30;i++){engine.stepRacer(r,p,{seq:i,x:0,z:1,jump:true},r.start+i*50);maxY=Math.max(maxY,p.y);assert.ok(p.z<wall.z-1,'wall cannot be jumped through');}assert.ok(maxY<engine.WALL_HEIGHT);}
