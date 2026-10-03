@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://kkokkkok-hideout.hhj3839.chatgpt.site/api/:path*"
+      "destination": "/api/game?endpoint=:path*"
     }
   ],
   "headers": [
