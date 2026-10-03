@@ -23,7 +23,7 @@ export function courseHint(z:number){const sector=courseSector(z),prefix=sector.
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
-export type Racer={id:string;token?:string;name:string;last:number;x:number;z:number;y:number;vy:number;pushVX?:number;at:number;seq:number;checkpoint:number;safeZ?:number;respawnUntil?:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
+export type Racer={id:string;token?:string;name:string;last:number;x:number;z:number;y:number;vy:number;pushVX?:number;pushVZ?:number;at:number;seq:number;checkpoint:number;safeZ?:number;respawnUntil?:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
 export type RaceRoom={kind:'race';practice?:boolean;code:string;host:string;players:Racer[];finishers?:Racer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;winner:string};
 export const isRace=(v:unknown):v is RaceRoom=>!!v&&typeof v==='object'&&'kind' in v&&v.kind==='race';
 export function makeRacer(id:string,name:string,now:number,color=0):Racer{return {id,name,last:now,x:0,z:START,y:0,vy:0,at:now,seq:0,checkpoint:0,safeZ:START,respawnUntil:0,falls:0,finished:0,stun:0,bounce:0,peak:0,color};}
@@ -37,9 +37,9 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  if(r.phase!=='playing'||r.paused||at<r.start||at>r.end||p.finished||at<(p.respawnUntil||0))return;
  const dt=STEP/1000,t=raceTime(r,at),norm=Math.max(1,Math.hypot(c.x,c.z)),ox=p.x,oz=p.z;
  // Brief momentum lets a moving wall carry a player beyond the road edge.
- p.x+=(p.pushVX||0)*dt;p.pushVX=(p.pushVX||0)*.86;
+ p.x+=(p.pushVX||0)*dt;p.z+=(p.pushVZ||0)*dt/courseSpeedScale(ox,oz);p.pushVX=(p.pushVX||0)*.86;p.pushVZ=(p.pushVZ||0)*.86;
  if(Math.abs(p.pushVX)<.05)p.pushVX=0;
- if(at>=p.stun){p.x+=c.x/norm*SPEED*dt;p.z+=c.z/norm*SPEED*dt/courseSpeedScale(ox,oz);}else p.z-=2*dt;
+ if(at>=p.stun){p.x+=c.x/norm*SPEED*dt;p.z+=c.z/norm*SPEED*dt/courseSpeedScale(ox,oz);}
  p.z=Math.max(START,Math.min(FINISH,p.z));
  if(p.y===0&&at>=p.stun)for(const b of BELTS)if(Math.abs(p.z-b.z)<b.d/2)p.x+=b.dir*3.2*dt;
  if(c.jump&&at>=p.stun&&p.y===0&&ground(ox,oz,t))p.vy=9;
@@ -64,11 +64,23 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
   if(Math.abs(delta)>.00001&&(ox-previous)*Math.sign(delta)>=0){const direction=Math.sign(delta);p.x=current+direction*(half+.01);p.pushVX=delta/dt;}
   else p.x=current+(ox>=current?1:-1)*(half+.01);
  }
- for(const z of GATES){const a=gateAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<5.9&&Math.abs(across)<.7&&p.y<WALL_HEIGHT){p.x=ox;p.z=oz<=z?Math.min(oz,z-1.1):Math.max(oz,z+1.1);}}
+ // Push along the rotating face normal instead of snapping across the pivot.
+ const rotatingContact=(z:number,a:number,omega:number,length:number)=>{
+  if(p.y>=WALL_HEIGHT||p.y< -2)return;
+  const cs=Math.cos(a),sn=Math.sin(a),dx=p.x,dz=p.z-z;
+  const along=dx*cs+dz*sn,across=-dx*sn+dz*cs;
+  if(Math.abs(along)>=length||Math.abs(across)>=.72)return;
+  const previous=a-omega*dt,oldAcross=-ox*Math.sin(previous)+(oz-z)*Math.cos(previous);
+  const motionSide=Math.sign(along)||1,side=Math.sign(oldAcross)||motionSide;
+  const correction=side*.74-across;
+  p.x-=sn*correction;p.z+=cs*correction;
+  if(side===motionSide){const speed=Math.min(6,Math.max(1,Math.abs(along)*omega));p.pushVX=-sn*side*speed;p.pushVZ=cs*side*speed;p.stun=at+100;}
+ };
+ for(const z of GATES)rotatingContact(z,gateAngle(t,z),1.05,5.9);
+ for(const z of SPINNERS)rotatingContact(z,spinnerAngle(t,z),2.7,6);
  for(const z of PENDULUMS){const ball=pendulum(t,z);if(Math.hypot(p.x-ball.x,p.z-z)<1.7&&Math.abs(p.y+.9-ball.y)<2&&at>=p.stun){p.x+=(p.x>=ball.x?1:-1)*1.7;p.z-=1.2;p.vy=4;p.stun=at+650;}}
- for(const z of SPINNERS){const a=spinnerAngle(t,z),dx=p.x,dz=p.z-z,along=dx*Math.cos(a)+dz*Math.sin(a),across=-dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(along)<6&&Math.abs(across)<.7&&p.y<WALL_HEIGHT&&p.y> -2&&at>=p.stun){p.stun=at+600;p.z-=1.8;p.vy=3;}}
  if(BOUNCERS.some(z=>Math.abs(p.z-z)<1.4)&&Math.abs(p.x)<2.4&&p.y===0&&at>p.bounce){p.vy=12;p.bounce=at+1400;}
- if(p.y< -5){p.x=0;p.z=p.safeZ??START;p.y=0;p.vy=0;p.pushVX=0;p.falls++;p.stun=0;p.bounce=0;p.respawnUntil=at+RESPAWN_DELAY;return;}
+ if(p.y< -5){p.x=0;p.z=p.safeZ??START;p.y=0;p.vy=0;p.pushVX=0;p.pushVZ=0;p.falls++;p.stun=0;p.bounce=0;p.respawnUntil=at+RESPAWN_DELAY;return;}
  if(p.y===0&&safeRecoveryPoint(p.z))p.safeZ=p.z;
  const next=CHECKPOINTS[p.checkpoint];if(next!==undefined&&oz<next&&p.z>=next&&p.y>=0)p.checkpoint++;
 
