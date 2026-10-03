@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {solidRenderer} from './solid-renderer';
 import {buildTheme} from './theme-world';
 import {applyPoseRig,poseLift,poseCenter} from './pose-rig';
-import {hidingSpots,showHidingHints,mapGround,mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
+import {roomBounds,areaWalls,hidingSpots,showHidingHints,mapGround,mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
 export type SceneInput={dx:number;dy:number;dz?:number;yaw:number};
 export type ViewMode='move'|'paint'|'look';
 export type SceneHandle={centerTarget:()=>string;shoot:()=>string;previewView:(side:number)=>void;resetView:()=>void;rotateView:(delta:number)=>void;zoom:(delta:number)=>void};
@@ -86,8 +86,13 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  const drawSolids=solidRenderer(scene,surfaces,blockers);
  drawSolids(mapGround(mapId).filter(o=>mapId!=='art'||o.kind!=='art'),true);
  drawSolids(mapCover(mapId));
+ const boundaryParts=areaWalls(props.room);drawSolids(boundaryParts);
+ for(const wall of boundaryParts){
+  const cv=document.createElement('canvas');cv.width=512;cv.height=128;const ctx=cv.getContext('2d')!;ctx.fillStyle='#f4d572';ctx.fillRect(0,0,512,128);ctx.fillStyle='#263627';ctx.font='bold 38px sans-serif';ctx.textAlign='center';ctx.fillText('여기까지 놀이 구역',256,78);const tex=new THREE.CanvasTexture(cv);textures.push(tex);const mat=new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide});const sign=new THREE.Mesh(new THREE.PlaneGeometry(4,.95),mat);sign.position.set((wall.x+wall.w/2)/100,2.6,(wall.y+wall.h/2)/100);if(wall.w===16){sign.rotation.y=-Math.PI/2;sign.position.x=wall.x/100-.02;}else sign.position.z=wall.y/100-.02;scene.add(sign);
+ }
+ const playBounds=roomBounds(props.room);
  const hintGroup=new THREE.Group();scene.add(hintGroup);
- for(const [i,spot] of hidingSpots(mapId).entries()){
+ for(const [i,spot] of hidingSpots(mapId).filter(s=>s.x<playBounds.width-28&&s.y<playBounds.height-28).entries()){
   const cv=document.createElement('canvas');cv.width=256;cv.height=128;const ctx=cv.getContext('2d')!;ctx.fillStyle='#d0ec92';ctx.beginPath();ctx.roundRect(4,4,248,120,24);ctx.fill();ctx.fillStyle='#193526';ctx.font='bold 30px sans-serif';ctx.textAlign='center';ctx.fillText((i+1)+' · '+spot.label,128,58);ctx.font='22px sans-serif';ctx.fillText('나에게만 보이는 안내',128,96);const tex=new THREE.CanvasTexture(cv);textures.push(tex);const marker=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,depthWrite:false,opacity:.88,transparent:true}));marker.position.set(spot.x/100,spot.elevation+1.3,spot.y/100);marker.scale.set(2.4,1.2,1);marker.renderOrder=10;hintGroup.add(marker);
  }
  const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,startX=0,startY=0,paintDrag=false,button=0;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let wasPreview=false;let targetCenter=new THREE.Vector3(5.8,1,1.1);

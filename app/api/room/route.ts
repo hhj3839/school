@@ -2,7 +2,7 @@ import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-li
 import {classroomState} from '../../classroom';
 import {packPaint,unpackPaint} from '../../paint-codec';
 import { database } from '../../../db/raw';
-import { stepHeight,DEFAULT_SETTINGS,parseSettings,roomSettings,adjustPose,advance,attachToWall,catchTarget,makePlayer,makeRoom,move,moveHeight,nextPhase,publicRoom,type Room } from '../../game';
+import { roomBounds,stepHeight,DEFAULT_SETTINGS,parseSettings,roomSettings,adjustPose,advance,attachToWall,catchTarget,makePlayer,makeRoom,move,moveHeight,nextPhase,publicRoom,type Room } from '../../game';
 export const dynamic='force-dynamic';
 function wireRoom(r:Room,known?:Record<string,number>){return {...r,players:r.players.map(p=>({...p,paint:known&&Object.hasOwn(known,p.id)&&known[p.id]===(p.paintVersion||0)?undefined:Array.isArray(p.paint)?packPaint(p.paint):p.paint}))};}
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -30,9 +30,9 @@ export async function POST(req:Request){try{
  if(a.action==='join'&&!p){if(r.phase!=='lobby'&&r.phase!=='result')return reply({error:'게임 중이에요. 다음 판에 들어와 주세요.'},409);if(r.players.length>=roomSettings(r).maxPlayers)return reply({error:'방 정원이 모두 찼어요. 다른 방을 이용해 주세요.'},409);p=makePlayer(crypto.randomUUID(),String(a.name||'친구').trim().slice(0,12)||'친구',now);token=crypto.randomUUID();p.token=token;r.players.push(p);}
  if(!p)return reply({error:'입장 정보가 없어요. 방 코드로 다시 들어와 주세요.'},401);
  if(a.action==='settings'){if(r.host!==p.id)return reply({error:'방장만 설정할 수 있어요.'},403);if(!['lobby','result'].includes(r.phase))return reply({error:'설정은 대기 중이나 판이 끝난 뒤에 바꿔 주세요.'},409);const settings=parseSettings(a.settings);if(!settings||settings.maxPlayers<r.players.length)return reply({error:'설정을 확인해 주세요. 정원은 현재 인원보다 작을 수 없어요.'},400);r.settings=settings;}
- else if(a.action==='tick'){if(!r.paused&&(r.phase==='seek'||['lobby','paint','hide'].includes(r.phase)&&p.role==='hider')&&!p.caught){move(p,Number.isFinite(a.dx)?Math.max(-1,Math.min(1,a.dx)):0,Number.isFinite(a.dy)?Math.max(-1,Math.min(1,a.dy)):0,(now-p.moveAt)/1000,roomSettings(r).mapId);moveHeight(p,a.dz,(now-p.moveAt)/1000,roomSettings(r).mapId);}p.moveAt=now;}
+ else if(a.action==='tick'){if(!r.paused&&(r.phase==='seek'||['lobby','paint','hide'].includes(r.phase)&&p.role==='hider')&&!p.caught){move(p,Number.isFinite(a.dx)?Math.max(-1,Math.min(1,a.dx)):0,Number.isFinite(a.dy)?Math.max(-1,Math.min(1,a.dy)):0,(now-p.moveAt)/1000,roomSettings(r).mapId,roomBounds(r));moveHeight(p,a.dz,(now-p.moveAt)/1000,roomSettings(r).mapId);}p.moveAt=now;}
  else if(a.action==='heightStep'){if(!stepHeight(r,p,a.direction,now))return reply({error:'지금은 높이를 바꿀 수 없어요.'},409);}
- else if(a.action==='wall'){if(r.paused||p.caught||p.role==='seeker')return reply({error:'숨는 사람만 벽에 붙을 수 있어요.'},409);if(!attachToWall(p,roomSettings(r).mapId))return reply({error:'벽 가까이 이동한 뒤 다시 눌러 주세요.'},409);}
+ else if(a.action==='wall'){if(r.paused||p.caught||p.role==='seeker')return reply({error:'숨는 사람만 벽에 붙을 수 있어요.'},409);if(!attachToWall(p,roomSettings(r).mapId,roomBounds(r)))return reply({error:'벽 가까이 이동한 뒤 다시 눌러 주세요.'},409);}
  else if(a.action==='pose'){if(r.paused||p.caught)return reply({error:'지금은 자세를 바꿀 수 없어요.'},409);adjustPose(p,a);if(typeof a.locked==='boolean'){p.locked=a.locked;}if(Number.isFinite(a.angle))p.angle=((a.angle%(Math.PI*2))+Math.PI*2)%(Math.PI*2);}
  else if(a.action==='paint'){if(!['lobby','paint','hide','result'].includes(r.phase))return reply({error:'색칠 시간이 끝났어요.'},409);const paint=unpackPaint(a.paint);if(!paint)return reply({error:'그림을 다시 확인해 주세요.'},400);p.paint=paint;p.paintVersion=(p.paintVersion||0)+1;}
  else if(a.action==='catch'){catchTarget(r,p,String(a.target||''),now);}
