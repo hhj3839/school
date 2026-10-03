@@ -1,0 +1,1 @@
+ALTER TABLE `classroom` ADD `featured_code` text;

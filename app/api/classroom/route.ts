@@ -2,11 +2,11 @@ import {MAX_ROOMS,ROOM_IDLE_MS,cleanIdleRooms} from '../../room-limits';
 import { env } from 'cloudflare:workers';
 import { database } from '../../../db/raw';
 import {teacherRoomSummary} from '../../teaching';
-import {advance,type Room} from '../../game';
+import {advance,mapName,roomSettings,type Room} from '../../game';
 import { classroomState } from '../../classroom';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{return reply(await classroomState());}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
+export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room;advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,mapName:mapName(roomSettings(r).mapId),count,capacity:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<roomSettings(r).maxPlayers};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
 async function authorized(req:Request){
   const secret=(env as unknown as {TEACHER_KEY?:string}).TEACHER_KEY;
   const key=req.headers.get('authorization')?.replace(/^Bearer /,'');
@@ -23,7 +23,12 @@ export async function POST(req:Request){try{
   if(action==='status'){
     const now=Date.now(),db=database();await cleanIdleRooms(now);const rows=await db.prepare('SELECT state FROM rooms WHERE expires>? ORDER BY version DESC').bind(now).all<{state:string}>();
     const rooms=rows.results.map(row=>JSON.parse(row.state) as Room).filter(r=>r.players.some(p=>now-p.last<120000)).map(r=>teacherRoomSummary(r,now));
-    return reply({rooms,updatedAt:now,limits:{maxRooms:MAX_ROOMS,idleSeconds:ROOM_IDLE_MS/1000},totals:{rooms:rooms.length,playing:rooms.filter(r=>!['lobby','result'].includes(r.phase)).length,online:rooms.reduce((n,r)=>n+r.online,0)}});
+    const featured=await db.prepare('SELECT featured_code FROM classroom WHERE id=1').first<{featured_code:string|null}>();return reply({featuredCode:featured?.featured_code,rooms,updatedAt:now,limits:{maxRooms:MAX_ROOMS,idleSeconds:ROOM_IDLE_MS/1000},totals:{rooms:rooms.length,playing:rooms.filter(r=>!['lobby','result'].includes(r.phase)).length,online:rooms.reduce((n,r)=>n+r.online,0)}});
+  }
+  if(action==='featureRoom'||action==='unfeatureRoom'){
+    const db=database();if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
+    const result=action==='featureRoom'?await db.prepare('UPDATE classroom SET featured_code=? WHERE id=1 AND opened=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND expires>?)').bind(code,code,Date.now()).run():await db.prepare('UPDATE classroom SET featured_code=NULL WHERE id=1 AND featured_code=?').bind(code).run();
+    return result.meta.changes?reply({ok:true}):reply({error:'방이 종료되었거나 변경됐어요. 목록을 확인해 주세요.'},409);
   }
   if(['pauseRoom','resumeRoom','endRoom'].includes(action)){
     if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
@@ -45,7 +50,7 @@ export async function POST(req:Request){try{
   const db=database();
   // The switch and room invalidation commit together. Reopening never revives old rooms.
   await db.batch([
-    db.prepare('UPDATE classroom SET opened=?,revision=revision+1,last_created=0 WHERE id=1').bind(action==='open'?1:0),
+    db.prepare('UPDATE classroom SET opened=?,revision=revision+1,last_created=0,featured_code=NULL WHERE id=1').bind(action==='open'?1:0),
     db.prepare('UPDATE rooms SET expires=0'),
   ]);
   return reply(await classroomState());

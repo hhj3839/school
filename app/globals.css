@@ -74,3 +74,6 @@ section.entry-practice{display:block;max-width:1080px;padding:24px 28px;backgrou
 .immersive[data-guide] .stage-heading{display:none}
 
 .area-badge{font-size:13px;color:#e0f1ae;border-top:1px solid #b9d59b55;padding-top:4px}
+
+.mode-bar[hidden]{display:none!important}.featured-room{background:#d9f4df!important;border:2px solid #348856!important}.spectator-panel{position:absolute;z-index:15;bottom:20px;right:20px;width:min(360px,calc(100% - 40px));padding:16px;border-radius:18px;background:#fff9ed;box-shadow:0 3px 16px #0003;display:grid;gap:8px}.spectator-panel label{display:grid;gap:6px}.spectator-panel select{min-height:48px;font:inherit;width:100%;border-radius:10px;padding:8px}.spectator-panel small{line-height:1.5}
+.spectator-panel{color:#203b31}.spectator-panel select{color:#203b31;background:#fff}
