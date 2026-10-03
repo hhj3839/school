@@ -2,10 +2,13 @@
 // Rendering and movement share the same circular arcs and track width.
 export const COURSE_LENGTH=880;
 export const STAGES=[0,220,440,660];
-export const TURNS=STAGES.flatMap((offset,stage)=>[[34,58],[104,128],[170,194]].map(([a,b],i)=>{const direction=(stage*3+i)%2===0?1:-1;return {start:offset+a,end:offset+b,angle:direction*Math.PI/2,label:direction>0?'왼쪽 커브':'오른쪽 커브'};}));
+// Four identical sectors, each turning 90 degrees, close the circuit exactly.
+export const TURNS=STAGES.flatMap(offset=>[[34,58],[104,128],[170,194]].map(([a,b])=>({start:offset+a,end:offset+b,angle:Math.PI/6,label:'왼쪽 커브'})));
+export const CHECKPOINTS=[110,220,330,440,550,660,770];
 export const NARROWS=STAGES.map((offset,i)=>({start:offset+173,end:offset+194,halfWidth:2.8-i*.3}));
 export function trackHalfWidth(z:number){return NARROWS.find(n=>z>=n.start&&z<=n.end)?.halfWidth??7;}
 export function coursePoint(offset:number,distance:number){
+ distance=((distance%COURSE_LENGTH)+COURSE_LENGTH)%COURSE_LENGTH;
  let x=0,z=0,heading=0,cursor=0,curvature=0;
  for(const turn of TURNS){
   const straight=Math.min(distance,turn.start)-cursor;
