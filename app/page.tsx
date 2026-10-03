@@ -110,8 +110,8 @@ function Game(){
  <h1>{entry==='home'?'어떻게 놀까요?':entry==='join'?'친구 방 들어가기':entry==='create'?'우리 방 만들기':'혼자 연습하기'}</h1>
  <label className="field-label" htmlFor="welcome-name">내 이름</label>
  <input id="welcome-name" autoComplete="off" placeholder="이름이나 별명을 써요" maxLength={12} value={name} onChange={e=>setName(e.target.value)}/>
- {entry==='home'?<div className="entry-actions">
- {featured&&<button className="entry-choice featured-room" disabled={busy||!featured.canJoin} onClick={()=>void enter('join',featured.code)}><Users size={34}/><span><strong>우리 반 들어가기</strong><small>{featured.mapName} · {featured.count}/{featured.capacity}명{!featured.canJoin?' · 다음 입장을 기다려요':' · 코드 없이 바로 입장'}</small></span></button>}
+ {entry==='home'?<div className="entry-actions"><a className="blocks-game-link" href="/blocks">▦ 블록 대결 <small>2–4명 · 공격 모드</small></a>
+ {featured&&<button className="entry-choice featured-room" disabled={busy||!featured.canJoin} onClick={()=>{if(featured.kind==='blocks')location.href='/blocks?room='+featured.code;else void enter('join',featured.code);}}><Users size={34}/><span><strong>우리 반 들어가기</strong><small>{featured.mapName} · {featured.count}/{featured.capacity}명{!featured.canJoin?' · 다음 입장을 기다려요':' · 코드 없이 바로 입장'}</small></span></button>}
   <button className="entry-choice join-choice" onClick={()=>setEntry('join')}><Users size={34}/><span><strong>친구 방 들어가기</strong><small>방 코드가 있어요</small></span><ArrowRight size={24}/></button>
   <button className="entry-choice create-choice" onClick={()=>{try{const preset=readPreset(localStorage.getItem(PRESET_KEY));if(preset)setSettingsDraft(preset);}catch{}setEntry('create');}}><Play size={34}/><span><strong>{studentCreate?'방 만들기':'선생님 방 만들기'}</strong><small>{studentCreate?'친구들을 초대해요':'선생님 비밀번호가 필요해요'}</small></span><ArrowRight size={24}/></button>
   <button className="entry-practice" onClick={()=>setEntry('practice')}><Paintbrush size={24}/>혼자 연습하기</button>
