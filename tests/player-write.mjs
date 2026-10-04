@@ -6,7 +6,7 @@ const sql=new DatabaseSync(':memory:');
 for(const f of readdirSync(new URL('../drizzle',import.meta.url)).filter(f=>f.endsWith('.sql')).sort())sql.exec(readFileSync(new URL('../drizzle/'+f,import.meta.url),'utf8'));
 globalThis.__testEnv={DB:{prepare(query){let values=[];return {bind(...v){values=v;return this;},async first(){return sql.prepare(query).get(...values)||null;},async run(){return {meta:sql.prepare(query).run(...values)};}};},async batch(statements){return Promise.all(statements.map(s=>s.run()));}}};
 registerHooks({resolve(s,c,next){if(s==='cloudflare:workers')return {url:'test:cloudflare',shortCircuit:true};try{return next(s,c)}catch(e){if(s.startsWith('.'))return next(s+'.ts',c);throw e;}},load(url,c,next){if(url==='test:cloudflare')return {format:'module',source:'export const env=globalThis.__testEnv;',shortCircuit:true};return next(url,c);}});
-const {writePlayer}=await import('../app/player-write.ts');
+const {writePlayer,writeControl}=await import('../app/player-write.ts');
 const now=Date.now(),revision=sql.prepare('SELECT revision FROM classroom WHERE id=1').get().revision;
 const original={phase:'paint',paused:0,players:Array.from({length:20},(_,i)=>({id:String(i),x:0,paint:{size:4,runs:['#ffffff',4]}}))};
 const save=r=>sql.prepare('INSERT OR REPLACE INTO rooms(code,state,version,expires) VALUES (?,?,0,?)').run('ABC234',JSON.stringify(r),now+120000);
@@ -20,4 +20,5 @@ save({...original,paused:now});assert.equal(await writePlayer(original,next,'0',
 save({...original,players:original.players.slice(1)});assert.equal(await writePlayer(original,next,'0','ABC234',now,revision),false,'removed players cannot reappear');
 save(original);sql.exec('UPDATE classroom SET revision=revision+1');assert.equal(await writePlayer(original,next,'0','ABC234',now,revision),false,'classroom revision invalidates old writes');
 const attack=structuredClone(original);attack.players[0].x=1;attack.players[1].x=1;assert.equal(await writePlayer(original,attack,'0','ABC234',now,revision),null,'cross-player effects require room CAS');
+save(original);const moved=structuredClone(original);moved.players[0].x=71;assert.equal(await writePlayer(original,moved,'0','ABC234',now,revision+1),true);assert.equal(await writeControl(original,{...original,paused:now},'ABC234',now,revision+1),true,'pause does not retry for unrelated movements');assert.equal(read().players[0].x,71,'pause preserves latest movement');assert.equal(read().paused,now);assert.equal(await writePlayer(moved,{...moved,players:moved.players.map(p=>({...p,x:99}))},'0','ABC234',now,revision+1),null);
 console.log('PASS: 20 independent stale snapshots merge, same-player deduplication, pause, removal, classroom revision and multi-player fallback');

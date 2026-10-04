@@ -89,3 +89,6 @@ section.entry-practice{display:block;max-width:1080px;padding:24px 28px;backgrou
 .teacher-panel .teacher-delete{background:#f5d9d4;color:#8b2f26}.teacher-delete-confirm{padding:14px;margin:12px 0;background:#fff0ed;border:1px solid #e3b7b0;border-radius:14px}
 
 .quick-guide{position:fixed;top:100px;left:50%;transform:translateX(-50%);z-index:35;display:flex;align-items:center;gap:18px;max-width:90vw;padding:12px 18px;background:#fffbea;border:2px solid #e8cc75;border-radius:20px;box-shadow:0 5px 20px #263e5020}.quick-guide small,.quick-guide strong{display:block}.quick-guide small{font-size:12px;color:#76663c}.quick-guide strong{font-size:18px}.quick-guide button{min-height:44px;padding:8px 14px;border-radius:14px;background:#e7f5e9;white-space:nowrap}.connection-warning{padding:8px 14px;background:#fff2cd;color:#6e531c;border-radius:12px}
+
+.blocks-playing .quick-guide{left:auto;right:24px;top:150px;transform:none;width:220px;max-width:24vw;flex-direction:column;align-items:stretch}.blocks-playing .quick-guide strong{font-size:17px}@media(max-height:600px){.blocks-playing .quick-guide{top:115px;right:14px;padding:10px}.quick-guide{top:80px}}
+.race-playing .quick-guide{top:130px}@media(max-height:600px){.race-playing .quick-guide{top:115px;max-width:55vw;padding:8px 12px}}

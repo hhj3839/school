@@ -1,6 +1,6 @@
 import {recordConnection} from '../../connection';
 import {database} from '../../../db/raw';
-import {writePlayer} from '../../player-write';
+import {writePlayer,writeControl} from '../../player-write';
 import {classroomState} from '../../classroom';
 import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-limits';
 import {advanceBlocks,blockCommand,finishBlocks,isBlocks,makeBlockPlayer,makeBlockRoom,pauseBlocks,publicBlocks,startBlocks,type Command} from '../../blocks/engine';
@@ -50,13 +50,14 @@ export async function POST(req:Request){try{
   }else if(['start','pause','end','mode'].includes(a.action)){
    if(p.id!==r.host)return reply({error:'방장만 바꿀 수 있어요.'},403);
    if(a.action==='start'){if(r.phase==='playing'||r.players.length<2)return reply({error:'친구가 2명 이상 모이면 시작해요.'},409);startBlocks(r,now,seed());p=r.players.find(q=>q.id===p!.id)!;}
-   if(a.action==='pause')pauseBlocks(r,now,!r.paused);
+   if(a.action==='pause')pauseBlocks(r,now,typeof a.paused==='boolean'?a.paused:!r.paused);
    if(a.action==='end')finishBlocks(r,'방장이 이번 판을 마쳤어요');
    if(a.action==='mode'){if(r.phase==='playing')return reply({error:'경기가 끝나면 바꿀 수 있어요.'},409);r.attack=!!a.attack;}
   }else if(a.action==='leave'){
    r.players=r.players.filter(q=>q.id!==p!.id);if(!r.players.length){const removed=await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();if(removed.meta.changes)return reply({left:true});continue;}
    if(r.host===p.id)r.host=r.players[0].id;advanceBlocks(r,now);
   }else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
+ if(['pause','end'].includes(a.action)){const saved=await writeControl(JSON.parse(before),r,code,now,gate.revision);if(saved)return reply({room:publicBlocks(r),id:p.id,serverTime:now});if(saved===false)continue;}
   if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;recordConnection(p,a.rtt,now);
   if(JSON.stringify(r)===before)return reply({room:publicBlocks(r),id:p.id,serverTime:now});
   if(['input','state'].includes(a.action)){

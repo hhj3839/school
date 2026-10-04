@@ -1,3 +1,4 @@
+import {writeControl} from '../../player-write';
 import {recordConnection} from '../../connection';
 import {database} from '../../../db/raw';
 import {classroomState} from '../../classroom';
@@ -37,10 +38,11 @@ export async function POST(req:Request){try{
   }else if(['start','pause','end'].includes(a.action)){
    if(p.id!==r.host)return reply({error:'방장만 바꿀 수 있어요.'},403);
    if(a.action==='start'){if(r.phase==='playing'||r.players.length<2)return reply({error:'2명 이상 모이면 시작할 수 있어요.'},409);startRace(r,now);p=r.players.find(q=>q.id===p!.id)!;}
-   if(a.action==='pause')pauseRace(r,now,!r.paused);if(a.action==='end')finishRace(r,'방장이 이번 판을 마쳤어요');
+   if(a.action==='pause')pauseRace(r,now,typeof a.paused==='boolean'?a.paused:!r.paused);if(a.action==='end')finishRace(r,'방장이 이번 판을 마쳤어요');
   }else if(a.action==='leave'){
    r.players=r.players.filter(q=>q.id!==p!.id);if(!r.players.length){const result=await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();if(result.meta.changes)return reply({left:true});continue;}if(r.host===p.id)r.host=r.players[0].id;advanceRace(r,now);
   }else if(!['state','join'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
+ if(['pause','end'].includes(a.action)){const saved=await writeControl(JSON.parse(before),r,code,now,gate.revision);if(saved)return reply({room:publicRace(r),id:p.id,serverTime:now});if(saved===false)continue;}
   if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;recordConnection(p,a.rtt,now);
   if(before===JSON.stringify(r))return reply({room:publicRace(r),id:p.id,serverTime:now});
   // Moving peers must not invalidate each other's writes. Compare and replace

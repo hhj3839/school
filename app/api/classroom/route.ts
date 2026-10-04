@@ -1,3 +1,4 @@
+import {writeControl} from '../../player-write';
 import {isRace,advanceRace,finishRace,pauseRace,CAPACITY,type RaceRoom} from '../../race/engine';
 import {isBlocks,advanceBlocks,finishBlocks,pauseBlocks,type BlockRoom} from '../../blocks/engine';
 import {MAX_ROOMS,ROOM_IDLE_MS,cleanIdleRooms} from '../../room-limits';
@@ -46,6 +47,7 @@ export async function POST(req:Request){try{
       else if(action==='endRoom'){room.phase='result';room.end=0;room.paused=0;room.winner='선생님이 이번 판을 마쳤어요';}
       else if(action==='pauseRoom'&&!room.paused)room.paused=now;
       else if(action==='resumeRoom'&&room.paused){room.end+=now-room.paused;room.players.forEach(p=>{p.moveAt=now;if(p.reloadUntil)p.reloadUntil+=now-room.paused;});room.paused=0;}
+      if(['pauseRoom','endRoom'].includes(action)){const controlled=await writeControl(JSON.parse(row.state),room,code,now,gate.revision);if(controlled)return reply({room:teacherRoomSummary(room,now)});if(controlled===false)continue;}
       const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1 WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(room),code,row.version,now,gate.revision).run();
       if(saved.meta.changes)return reply({room:teacherRoomSummary(room,now)});
     }
