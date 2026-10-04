@@ -1,6 +1,7 @@
 import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-limits';
 import {visibleTo,shotTarget,validAim} from '../../server-vision';
 import {HEARTBEAT_MS} from '../../network-policy';
+import {writePlayer} from '../../player-write';
 import {classroomState} from '../../classroom';
 import {packPaint,unpackPaint} from '../../paint-codec';
 import { database } from '../../../db/raw';
@@ -43,7 +44,13 @@ export async function POST(req:Request){try{
  else if(a.action==='leave'){r.players=r.players.filter(q=>q.id!==p!.id);if(r.host===p.id&&r.players.length)r.host=r.players[0].id;if(!r.players.length){const deleted=await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();if(deleted.meta.changes)return reply({left:true});continue;}if(!r.players.some(q=>q.role==='seeker')&&!['lobby','result'].includes(r.phase)){r.phase='result';r.winner='술래가 나가서 판이 끝났어요';}advance(r,now);}
  else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
  if(['state','tick'].includes(a.action)&&lifecycle()===beforeLifecycle&&motion()===beforeMotion&&now-p.last<HEARTBEAT_MS&&row.expires>now+HEARTBEAT_MS)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,serverTime:now});
- p.last=now;const result=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(wireRoom(r)),now+ROOM_IDLE_MS,code,row.version,now,gate.revision).run();if(result.meta.changes)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,...(shot?{shot}:{}),...(token?{token}:{}),serverTime:now});
+ p.last=now;
+ if(['tick','state','paint','pose','heightStep','wall'].includes(a.action)){
+  const saved=await writePlayer(JSON.parse(row.state),wireRoom(r),p.id,code,now,gate.revision);
+  if(saved)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,serverTime:now});
+  if(saved===false)continue;
+ }
+ const result=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(wireRoom(r)),now+ROOM_IDLE_MS,code,row.version,now,gate.revision).run();if(result.meta.changes)return reply({room:wireRoom(publicRoom(r,p.id,(v,t)=>visibleTo(r,v,t),a.watch),a.paintVersions),id:p.id,...(shot?{shot}:{}),...(token?{token}:{}),serverTime:now});
   await new Promise(resolve=>setTimeout(resolve,5+Math.floor(Math.random()*20)));
  }return reply({error:'잠시 연결이 밀렸어요. 다시 시도해 주세요.'},503);
  }catch(e){console.error('room request',e);return reply({error:'연결하지 못했어요. 잠시 후 다시 시도해 주세요.'},500);}}

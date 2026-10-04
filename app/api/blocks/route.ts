@@ -1,4 +1,5 @@
 import {database} from '../../../db/raw';
+import {writePlayer} from '../../player-write';
 import {classroomState} from '../../classroom';
 import {MAX_ROOMS,ROOM_IDLE_MS,CREATE_GAP_MS,cleanIdleRooms} from '../../room-limits';
 import {advanceBlocks,blockCommand,finishBlocks,isBlocks,makeBlockPlayer,makeBlockRoom,pauseBlocks,publicBlocks,startBlocks,type Command} from '../../blocks/engine';
@@ -57,6 +58,11 @@ export async function POST(req:Request){try{
   }else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
   if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;
   if(JSON.stringify(r)===before)return reply({room:publicBlocks(r),id:p.id,serverTime:now});
+  if(['input','state'].includes(a.action)){
+   const saved=await writePlayer(JSON.parse(before),r,p.id,code,now,gate.revision);
+   if(saved)return reply({room:publicBlocks(r),id:p.id,serverTime:now});
+   if(saved===false)continue;
+  }
   const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(r),now+ROOM_IDLE_MS,code,row.version,now,gate.revision).run();
   if(saved.meta.changes)return reply(a.action==='leave'?{left:true}:{room:publicBlocks(r),id:p.id,...(newToken?{token:newToken}:{}),serverTime:now});
   await new Promise(resolve=>setTimeout(resolve,10+Math.random()*15));
