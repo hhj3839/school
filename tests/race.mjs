@@ -34,9 +34,19 @@ d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.play
 d=await play('input',{...sessions[0],round:1,commands});assert.equal(d.room.players[0].z,z,'retries cannot replay movement');
 d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].seq,8,'server time limits movement');
 assert.equal((await play('input',{...sessions[0],commands:[{seq:9,x:99,z:1,jump:false}]})).status,400);
+// All 20 read the same room version; different player writes must all survive.
+clock+=400;
+const concurrent=await Promise.all(sessions.map((session,i)=>play('input',{...session,round:1,commands:Array.from({length:6},(_,j)=>({seq:(i===0?8:0)+j+1,x:0,z:1,jump:false}))})));
+assert.ok(concurrent.every(r=>r.status===200),'20 concurrent player updates succeed');
+const merged=await play('state',sessions[0]);
+assert.ok(merged.room.players.every((p,i)=>p.seq===(i===0?14:6)),'no peer update overwritten');
+clock+=100;
+const repeated=await Promise.all(Array.from({length:3},()=>play('input',{...sessions[0],round:1,commands:[{seq:15,x:0,z:1,jump:false}]})));
+assert.ok(repeated.every(r=>r.status===200));
+assert.equal((await play('state',sessions[0])).room.players[0].seq,15,'concurrent duplicate input applied once');
 const manage=action=>call(classroom.POST,'classroom',{action,code:made.room.code},'test-only-secret');
-assert.equal((await manage('pauseRoom')).status,200);const end=d.room.end;clock+=10000;
-d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].z,z);
+assert.equal((await manage('pauseRoom')).status,200);const end=d.room.end;const pausedZ=(await play('state',sessions[0])).room.players[0].z;clock+=10000;
+d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false}]});assert.equal(d.room.players[0].z,pausedZ);
 assert.equal((await manage('resumeRoom')).status,200);d=await play('state',sessions[0]);assert.equal(d.room.end,end+10000);
 const summary=await control('status');assert.equal(summary.rooms[0].kind,'race');assert.equal(summary.rooms[0].online,20);
 assert.equal((await manage('endRoom')).status,200);d=await play('start',sessions[0]);assert.equal(d.room.round,2);assert.equal(d.room.players[0].seq,0);

@@ -42,6 +42,18 @@ export async function POST(req:Request){try{
   }else if(!['state','join'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
   if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;
   if(before===JSON.stringify(r))return reply({room:publicRace(r),id:p.id,serverTime:now});
+  // Moving peers must not invalidate each other's writes. Compare and replace
+  // only this player's JSON, while retaining room/teacher lifecycle guards.
+  const original=JSON.parse(before),index=original.players.findIndex((q:{id:string})=>q.id===p.id);
+  if(['input','state'].includes(a.action)&&r.phase==='playing'&&original.phase==='playing'&&index>=0&&r.players.length===original.players.length){
+   const path=`$.players[${index}]`,oldPlayer=original.players[index];
+   const newFinish=!oldPlayer.finished&&p.finished?r.finishers?.find(q=>q.id===p.id):undefined;
+   const expression=newFinish?"json_insert(json_set(state,?,json(?)),'$.finishers[#]',json(?))":"json_set(state,?,json(?))";
+   const values:unknown[]=[path,JSON.stringify(p)];if(newFinish)values.push(JSON.stringify(newFinish));
+   const saved=await db.prepare(`UPDATE rooms SET state=${expression},version=version+1,expires=? WHERE code=? AND expires>? AND json_extract(state,'$.round')=? AND json_extract(state,'$.phase')='playing' AND json_extract(state,'$.paused')=? AND json_extract(state,?)=json(?) AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)`).bind(...values,now+ROOM_IDLE_MS,code,now,r.round,original.paused,path,JSON.stringify(oldPlayer),gate.revision).run();
+   if(saved.meta.changes)return reply({room:publicRace(r),id:p.id,serverTime:now});
+   continue;
+  }
   const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1,expires=? WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(r),now+ROOM_IDLE_MS,code,row.version,now,gate.revision).run();
   if(saved.meta.changes)return reply(a.action==='leave'?{left:true}:{room:publicRace(r),id:p.id,...(token?{token}:{}),serverTime:now});
   await new Promise(resolve=>setTimeout(resolve,10+Math.random()*15));
