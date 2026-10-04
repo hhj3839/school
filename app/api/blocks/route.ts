@@ -1,3 +1,4 @@
+import {recordConnection} from '../../connection';
 import {database} from '../../../db/raw';
 import {writePlayer} from '../../player-write';
 import {classroomState} from '../../classroom';
@@ -56,7 +57,7 @@ export async function POST(req:Request){try{
    r.players=r.players.filter(q=>q.id!==p!.id);if(!r.players.length){const removed=await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();if(removed.meta.changes)return reply({left:true});continue;}
    if(r.host===p.id)r.host=r.players[0].id;advanceBlocks(r,now);
   }else if(!['join','state'].includes(a.action))return reply({error:'지원하지 않는 요청이에요.'},400);
-  if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;
+  if(now-p.last>=5000||!['state','input'].includes(a.action))p.last=now;recordConnection(p,a.rtt,now);
   if(JSON.stringify(r)===before)return reply({room:publicBlocks(r),id:p.id,serverTime:now});
   if(['input','state'].includes(a.action)){
    const saved=await writePlayer(JSON.parse(before),r,p.id,code,now,gate.revision);

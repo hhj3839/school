@@ -24,7 +24,7 @@ export function courseHint(z:number){const sector=courseSector(z),prefix=sector.
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
-export type Racer={id:string;token?:string;name:string;last:number;x:number;z:number;y:number;vy:number;pushVX?:number;pushVZ?:number;at:number;seq:number;checkpoint:number;safeZ?:number;respawnUntil?:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
+export type Racer={id:string;token?:string;name:string;last:number;connection?:{rtt:number;at:number};x:number;z:number;y:number;vy:number;pushVX?:number;pushVZ?:number;at:number;seq:number;checkpoint:number;safeZ?:number;respawnUntil?:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
 export type RaceRoom={kind:'race';practice?:boolean;code:string;host:string;players:Racer[];finishers?:Racer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;winner:string};
 export const isRace=(v:unknown):v is RaceRoom=>!!v&&typeof v==='object'&&'kind' in v&&v.kind==='race';
 export function makeRacer(id:string,name:string,now:number,color=0):Racer{return {id,name,last:now,x:0,z:START,y:0,vy:0,at:now,seq:0,checkpoint:0,safeZ:START,respawnUntil:0,falls:0,finished:0,stun:0,bounce:0,peak:0,color};}

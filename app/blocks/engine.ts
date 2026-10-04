@@ -3,7 +3,7 @@ export const COLORS=['#f5f9fb','#59bfd4','#8795df','#efab6b','#edc86a','#76bc93'
 export const SHAPES=[[[0,1],[1,1],[2,1],[3,1]],[[0,0],[0,1],[1,1],[2,1]],[[2,0],[0,1],[1,1],[2,1]],[[1,0],[2,0],[1,1],[2,1]],[[1,0],[2,0],[0,1],[1,1]],[[1,0],[0,1],[1,1],[2,1]],[[0,0],[1,0],[1,1],[2,1]]];
 export type Command='left'|'right'|'rotate'|'down'|'drop';
 export type Piece={kind:number;rotation:number;x:number;y:number};
-export type BlockPlayer={id:string;token?:string;name:string;last:number;board:number[];piece:Piece;queue:number[];seed:number;score:number;lines:number;sent:number;pending:number;incomingAt:number;out:boolean;outAt:number;fallAt:number;seq:number;inputAt:number;attackCursor:number};
+export type BlockPlayer={id:string;token?:string;name:string;last:number;connection?:{rtt:number;at:number};board:number[];piece:Piece;queue:number[];seed:number;score:number;lines:number;sent:number;pending:number;incomingAt:number;out:boolean;outAt:number;fallAt:number;seq:number;inputAt:number;attackCursor:number};
 export type BlockRoom={kind:'blocks';practice?:boolean;code:string;host:string;players:BlockPlayer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;attack:boolean;winner:string};
 export function isBlocks(value:unknown):value is BlockRoom{return !!value&&typeof value==='object'&&'kind' in value&&value.kind==='blocks';}
 function random(p:BlockPlayer){p.seed=(Math.imul(p.seed,1664525)+1013904223)>>>0;return p.seed/4294967296;}
