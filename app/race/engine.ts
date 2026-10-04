@@ -1,3 +1,4 @@
+import {sweptBlade} from './collision';
 import {COURSE_LENGTH,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
 export const FINISH=COURSE_LENGTH,STEP=50,DURATION=480000,CAPACITY=20;
 export const SPEED=13.5;
@@ -69,10 +70,11 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
   if(p.y>=WALL_HEIGHT||p.y< -2)return;
   const cs=Math.cos(a),sn=Math.sin(a),dx=p.x,dz=p.z-z;
   const along=dx*cs+dz*sn,across=-dx*sn+dz*cs;
-  if(Math.abs(along)>=length||Math.abs(across)>=.72)return;
+  const contact=sweptBlade(ox,oz-z,p.x,p.z-z,a-omega*dt,a,length);
+  if(!contact)return;
   const previous=a-omega*dt,oldAcross=-ox*Math.sin(previous)+(oz-z)*Math.cos(previous);
-  const motionSide=Math.sign(along)||1,side=Math.sign(oldAcross)||motionSide;
-  const correction=side*.74-across;
+  const motionSide=Math.sign(contact.along)||1,side=Math.sign(oldAcross)||motionSide;
+  const correction=side*Math.max(0,.74-side*across);
   p.x-=sn*correction;p.z+=cs*correction;
   if(side===motionSide){const speed=Math.min(6,Math.max(1,Math.abs(along)*omega));p.pushVX=-sn*side*speed;p.pushVZ=cs*side*speed;p.stun=at+100;}
  };
