@@ -8,7 +8,20 @@ export function groundParts(o:Layout):Cover[]{
  function part(x:number,z:number,w:number,d:number,b:number,h:number,color=c,shape:SolidShape='box'){
   out.push({x:o.x+x*o.w,y:o.y+z*o.h,w:w*o.w,h:d*o.h,base:b*o.height,height:h*o.height,color,shape,kind:o.kind});
  }
- if(o.kind==='tree'||o.kind==='plant'){
+ if(o.kind==='archway'){
+  part(0,0,.16,1,0,1);part(.84,0,.16,1,0,1);
+  part(0,0,1,1,.82,.18,c,'prism');
+ }else if(o.kind==='shelter'){
+  for(const x of [.02,.9])for(const z of [.02,.9])part(x,z,.08,.08,0,.78,'#78532f');
+  part(0,0,1,1,.75,.25,c,'prism');
+  part(0,.92,1,.08,.1,.35,c); // Open front and side passages.
+ }else if(o.kind==='worktable'){
+  part(0,0,1,1,.82,.18,c);
+  for(const x of [.04,.84])for(const z of [.04,.84])part(x,z,.12,.12,0,.82,'#78532f');
+ }else if(o.kind==='screen'){
+  part(.08,.38,.84,.12,.08,.92,c);part(0,.12,.16,.76,0,.08,'#78532f');part(.84,.12,.16,.76,0,.08,'#78532f');
+  for(let i=0;i<4;i++)part(.12+i*.2,.505,.08,.01,.15,.8,['#f2eee2','#dbba79'][i%2]);
+ }else if(o.kind==='tree'||o.kind==='plant'){
   part(.34,.34,.32,.32,0,.72,'#78532f','cylinder');
   part(0,.02,1,.96,.45,.55,c,'ellipsoid');part(.1,.1,.8,.8,.28,.44,'#68875d','ellipsoid');
   if(o.kind==='plant')part(.18,.18,.64,.64,0,.28,'#ad6246','cylinder');

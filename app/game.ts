@@ -1,6 +1,8 @@
 import {groundParts} from './ground-parts';
+import {extraProps} from './extra-props';
 import {createCover,coverContains,coverOverlaps} from './cover-layout';
-export const MAP_SCALE=Math.sqrt(3);
+// 1.5 times the previous floor area; each horizontal axis grows by sqrt(1.5).
+export const MAP_SCALE=Math.sqrt(4.5);
 export const W=1800*MAP_SCALE,H=1140*MAP_SCALE,SPEED=250,PAINT_SIZE=128;
 export const SHOT_COOLDOWN=800,SHOT_RANGE=750,MAGAZINE=3,RELOAD_MS=3000;
 export function ammunition(p:Player,now:number){const wait=Math.max(0,(p.reloadUntil||0)-now);return {remaining:wait?0:(p.reloadUntil?MAGAZINE:MAGAZINE-(p.shots||0)),wait};}
@@ -28,7 +30,7 @@ const layouts:Record<MapId,MapObstacle[]>={
  ocean:[prop(190,120,170,110,4,'coral','#ed7891'),prop(600,160,170,110,5,'reef','#456c79'),prop(980,100,280,150,3.8,'ship','#78532f'),prop(1480,150,110,100,7.8,'kelp','#358b73'),prop(180,460,180,100,2,'chest','#ad8051'),prop(730,400,160,120,3.5,'coral','#b377ce'),prop(1250,470,130,100,5.8,'reef','#426882'),prop(1580,570,100,100,7,'kelp','#358b73'),prop(180,870,200,140,3,'reef','#689399'),prop(590,900,200,100,2,'chest','#ad8051'),prop(990,870,170,130,4.2,'coral','#f0bd4c'),prop(1420,890,180,100,6,'kelp','#358b73')],
  museum:[prop(180,120,140,100,5.5,'column','#d8cdb6'),prop(570,120,190,85,3.4,'exhibit','#456c79'),prop(1030,140,210,80,3.6,'painting','#ab8055'),prop(1460,120,140,100,7,'column','#d8cdb6'),prop(170,440,170,100,3.2,'vase','#ad6246'),prop(700,410,200,110,3.6,'fossil','#b7ab8f'),prop(1220,450,210,80,3.6,'painting','#436966'),prop(1570,540,100,100,8.5,'column','#d8cdb6'),prop(180,860,210,100,3.6,'painting','#923f37'),prop(580,900,170,100,3.5,'vase','#689399'),prop(990,900,190,100,3.2,'exhibit','#dbba79'),prop(1400,860,200,120,4,'fossil','#b7ab8f')]
 };
-const scaledLayouts=Object.fromEntries(Object.entries(layouts).map(([id,items])=>[id,items.map(o=>({...o,x:o.x*MAP_SCALE,y:o.y*MAP_SCALE,w:o.w*MAP_SCALE,h:o.h*MAP_SCALE}))])) as Record<MapId,MapObstacle[]>;
+const scaledLayouts=Object.fromEntries(Object.entries(layouts).map(([id,items])=>[id,[...items,...extraProps(id as MapId)].map(o=>({...o,x:o.x*MAP_SCALE,y:o.y*MAP_SCALE,w:o.w*MAP_SCALE,h:o.h*MAP_SCALE}))])) as Record<MapId,MapObstacle[]>;
 const ground=Object.fromEntries(Object.entries(scaledLayouts).map(([id,items])=>[id,items.flatMap(groundParts)]));
 export function mapGround(mapId:MapId='art'){return ground[normalizeMapId(mapId)];}
 export function normalizeMapId(id:unknown):MapId{return id==='toys'?'amusement':MAPS.some(m=>m.id===id)?id as MapId:'art';}
