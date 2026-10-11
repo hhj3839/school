@@ -1,0 +1,30 @@
+/* Classroom stationery theme. Canvas, map geometry and player colors are untouched. */
+:root{--class-ink:#142548;--class-paper:#fffcf6;--class-pink:#f9b3b3;--class-mint:#97dace;--class-blue:#b3d0f8;--class-line:#a2aec3}
+body{background:var(--class-paper);color:var(--class-ink)}
+:is(.arcade-shell,.welcome,.blocks-page:not(.blocks-playing),.race-page:not(.race-playing)){color:var(--class-ink);background:radial-gradient(ellipse at 5% 8%,#ebf3ff 0,transparent 35%),radial-gradient(ellipse at 95% 90%,#fff0e7 0,transparent 35%),var(--class-paper)}
+:is(.arcade-entry,.welcome-card,.blocks-card,.blocks-lobby,.race-entry,.race-lobby,.teacher-panel){position:relative;background:#fffefa;border:1.5px dashed var(--class-line);border-radius:30px;box-shadow:0 7px 0 #14254808;padding:28px;color:var(--class-ink)}
+:is(.arcade-entry,.welcome-card,.blocks-card,.race-entry,.race-lobby)::before{content:'✦  함께 웃고, 함께 놀아요  ✦';display:block;position:relative;grid-column:1/-1;color:#7283a2;font-size:13px;font-weight:700;letter-spacing:1px;margin-bottom:18px;text-align:center;pointer-events:none}
+:is(.arcade-brand,.welcome-brand,.brand,.blocks-top,.race-header){color:var(--class-ink)}
+:is(.arcade-entry,.arcade-select,.welcome-card,.blocks-card,.blocks-lobby,.race-entry,.race-lobby,.teacher-panel) :is(h1,h2,strong){color:var(--class-ink)}
+:is(.welcome,.arcade-shell,.blocks-page:not(.blocks-playing),.race-page:not(.race-playing)) :is(p,small,.description,.field-label,.welcome-kicker,.welcome-tip,.blocks-hint,.blocks-lead,.race-rules,.race-help){color:#607184;line-height:1.7}
+:is(.arcade-step,.race-badge,.blocks-eyebrow,.welcome-kicker){background:#dfecff;color:#274768;border:0;border-radius:24px;padding:8px 14px;font-weight:800}
+:is(.arcade-game,.map-card,.entry-choice){border:1.5px dashed var(--class-line);border-radius:24px;box-shadow:0 4px 0 #14254808;color:var(--class-ink)}
+.arcade-game{background:#fff0e7}.arcade-game.blockbattle{background:#ebf3ff;color:var(--class-ink)}.arcade-game.racegame{background:#e6f7f1;color:var(--class-ink)}
+.arcade-game:hover{background:#ffe7dc}.arcade-game.blockbattle:hover{background:#dfecff}.arcade-game.racegame:hover{background:#d9f1e8}
+.arcade-game-text :is(strong,span,small){color:var(--class-ink)}
+:is(.welcome,.arcade-shell,.blocks-page:not(.blocks-playing),.race-page:not(.race-playing),.teacher-panel) button{border-radius:16px;min-height:48px;background:#ebf3ff;color:#274768;border:2px solid #ffffffaa;font-weight:800;box-shadow:0 3px 0 #14254808}
+:is(.welcome,.arcade-shell,.blocks-page:not(.blocks-playing),.race-page:not(.race-playing),.teacher-panel) button:hover{background:#dfecff}
+:is(.welcome,.arcade-shell,.blocks-page:not(.blocks-playing),.race-page:not(.race-playing),.teacher-panel) :is(.primary,.arcade-enter,.blocks-primary,.race-primary){background:var(--class-mint);color:#244e48;border-color:#ffffffa0;box-shadow:0 4px 0 #68b6aa55}
+.welcome .create-choice{background:#f9b3b3;color:#543347}.welcome .join-choice{background:#b3d0f8;color:#274768}.welcome .practice-entry{background:#eee4ff;color:#574774}
+:is(.welcome,.arcade-shell,.blocks-page:not(.blocks-playing),.race-page:not(.race-playing),.teacher-panel) :is(input:not([type=range]):not([type=color]),select){background:#fffefa;color:var(--class-ink);border:2px solid #d5deed;border-radius:16px;min-height:48px;font:inherit;padding:10px 12px}
+:is(.welcome,.arcade-shell,.blocks-page,.race-page,.teacher-panel) :is(button,input,select,a):focus-visible{outline:4px solid #4772b5;outline-offset:4px}
+.invite-code{background:#dfecff;color:#274768;border-radius:20px;letter-spacing:6px}
+:is(.lobby-players li,.blocks-seats>div,.blocks-seats>article,.race-seats article){background:#ebf3ff;color:var(--class-ink);border:1px solid #d5e2f3;border-radius:18px}
+.lobby-players li:nth-child(3n+2),.race-seats article:nth-child(3n+2){background:#e6f7f1}.lobby-players li:nth-child(3n),.race-seats article:nth-child(3n){background:#fff0e7}
+.lobby-players small{color:#546b85}.waiting-note,.pregame-rules,.welcome-join,.rule-recommendation,.simple-recommendation,.blocks-rules{background:#fff6dd;color:#304568;border:1px solid #f6e4af;border-radius:20px}
+.welcome .map-card{background:#ebf3ff;color:var(--class-ink)}.welcome .map-card.selected{background:#e6f7f1;border:2px solid #63b9ae;box-shadow:0 0 0 2px #97dace44}.welcome .map-card :is(small,span,strong){color:#304568}
+.welcome .room-options,.welcome .simple-options,.welcome .practice-options{border-color:#d6e0ed;background:#fffefa;border-radius:20px}.welcome .entry-back{color:#526a8b}
+.teacher-entry{color:#274768;background:#dfecff;border:2px solid #ffffff;border-radius:16px}.teacher-panel .teacher-dismiss{background:#ebf3ff;color:#274768}.teacher-panel .teacher-stop{background:#f9b3b3;color:#6c3644}.teacher-backdrop{background:#14254866}
+.immersive .workbench{background:#fffcf6f5;border:1.5px dashed #a2aec3;color:var(--class-ink);border-radius:24px}.immersive .drawer-heading,.immersive .panel-tabs{background:#ebf3ff;color:var(--class-ink)}.immersive .workbench :is(.field-label,.panel-title,.description,.room-code,.player){color:#304568}.immersive .workbench button:not(.palette button){background:#dfecff;color:#274768;border-radius:14px}.immersive .workbench .selected,.immersive .workbench .primary{background:#97dace;color:#244e48}.immersive .workbench input:not([type=color]):not([type=range]){background:#fffefa;color:var(--class-ink);border-color:#d5deed}
+.veil{background:#fffcf6ee;color:var(--class-ink)}.veil :is(h1,h2,strong,p){color:var(--class-ink)}.veil button{background:#97dace;color:#244e48;border-radius:18px}
+@media(max-width:600px){:is(.arcade-entry,.welcome-card,.blocks-card,.blocks-lobby,.race-entry,.race-lobby,.teacher-panel){padding:20px;border-radius:24px}.invite-code{letter-spacing:4px}:is(.arcade-entry,.welcome-card,.blocks-card,.race-entry,.race-lobby)::before{font-size:12px;letter-spacing:0}}
