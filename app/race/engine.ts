@@ -65,18 +65,13 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
   if(Math.abs(delta)>.00001&&(ox-previous)*Math.sign(delta)>=0){const direction=Math.sign(delta);p.x=current+direction*(half+.01);p.pushVX=delta/dt;}
   else p.x=current+(ox>=current?1:-1)*(half+.01);
  }
- // Push along the rotating face normal instead of snapping across the pivot.
+ // A rotating-wall hit throws the racer off the nearest side; input cannot undo the hit.
  const rotatingContact=(z:number,a:number,omega:number,length:number)=>{
   if(p.y>=WALL_HEIGHT||p.y< -2)return;
-  const cs=Math.cos(a),sn=Math.sin(a),dx=p.x,dz=p.z-z;
-  const along=dx*cs+dz*sn,across=-dx*sn+dz*cs;
   const contact=sweptBlade(ox,oz-z,p.x,p.z-z,a-omega*dt,a,length);
   if(!contact)return;
-  const previous=a-omega*dt,oldAcross=-ox*Math.sin(previous)+(oz-z)*Math.cos(previous);
-  const motionSide=Math.sign(contact.along)||1,side=Math.sign(oldAcross)||motionSide;
-  const correction=side*Math.max(0,.74-side*across);
-  p.x-=sn*correction;p.z+=cs*correction;
-  if(side===motionSide){const speed=Math.min(6,Math.max(1,Math.abs(along)*omega));p.pushVX=-sn*side*speed;p.pushVZ=cs*side*speed;p.stun=at+100;}
+  const direction=Math.sign(p.x)||Math.sign(-Math.sin(a)*(Math.sign(contact.along)||1))||1;
+  p.pushVX=direction*36;p.pushVZ=0;p.vy=3;p.stun=at+3000;
  };
  for(const z of GATES)rotatingContact(z,gateAngle(t,z),1.05,5.9);
  for(const z of SPINNERS)rotatingContact(z,spinnerAngle(t,z),2.7,6);
