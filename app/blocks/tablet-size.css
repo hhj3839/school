@@ -1,35 +1,39 @@
-/* Give the player's board the height; keep all five touch controls within reach. */
+/* Equal side columns keep the main board centered independently of player count. */
 @media(min-width:540px) and (min-height:450px){
- body .blocks-playing{height:100dvh;min-height:0;padding:0 14px 8px;display:flex;flex-direction:column;overflow:hidden}
- body .blocks-playing>.blocks-top{height:44px;min-height:44px;flex-shrink:0}
- body .blocks-playing .blocks-matchbar{height:40px;min-height:40px;margin:4px 0 8px;flex-shrink:0}
- body .blocks-playing .blocks-arena{flex:1;min-height:0;width:100%;max-width:none;gap:20px;align-items:flex-start}
- body .blocks-playing .blocks-mine{gap:12px;align-items:flex-start}
- body .blocks-playing .blocks-board-wrap>.block-board{height:min(calc(100dvh - 206px),calc((100vw - 244px)*2));width:auto;max-width:none}
- body .blocks-playing .blocks-stats{width:72px;gap:5px;padding-top:0}
- body .blocks-playing .blocks-stats>strong{font-size:23px;margin-bottom:8px}
- body .blocks-playing .blocks-stats>svg{width:68px;height:50px;margin-bottom:6px}
- body .blocks-playing .blocks-opponents{flex-direction:column;gap:12px}
- body .blocks-playing .mini-board{height:min(174px,calc((100dvh - 280px)/3));width:auto}
- body .blocks-playing .blocks-opponents header{margin-bottom:4px}
+ body .blocks-playing{height:100dvh;min-height:0;padding:0 14px 8px;display:grid;grid-template-rows:44px 44px minmax(0,1fr) 80px 20px;gap:8px;overflow:hidden}
+ body .blocks-playing>.blocks-top{height:44px;min-height:0;width:100%;max-width:none}
+ body .blocks-playing .blocks-matchbar{height:44px;min-height:0;margin:0;width:100%;max-width:1060px}
+ body .blocks-playing .blocks-arena{display:grid;grid-template-columns:minmax(100px,1fr) auto minmax(100px,1fr);grid-template-rows:1fr;gap:18px;align-items:start;width:100%;max-width:none;min-height:0;margin:0}
+ body .blocks-playing .blocks-mine{display:contents}
+ body .blocks-playing .blocks-board-wrap{grid-column:2;grid-row:1;justify-self:center;align-self:center}
+ body .blocks-playing .blocks-board-wrap>.block-board{height:min(calc(100dvh - 228px),calc((100vw - 280px)*2));width:auto;max-width:none}
+ body .blocks-playing .blocks-board-label{left:50%;transform:translate(-50%,-50%);white-space:nowrap}
+ body .blocks-playing .blocks-stats{grid-column:3;grid-row:1;justify-self:start;align-self:center;width:94px;gap:6px;padding:14px 10px;background:#ffffff80;border-radius:18px}
+ body .blocks-playing .blocks-stats>strong{font-size:25px;margin-bottom:10px}
+ body .blocks-playing .blocks-stats>svg{width:74px;height:54px;margin-bottom:8px}
+ body .blocks-playing .blocks-opponents{grid-column:1;grid-row:1;justify-self:end;align-self:center;display:flex;flex-direction:column;gap:10px;min-width:0;max-width:150px}
+ body .blocks-playing .mini-board{height:min(142px,calc((100dvh - 400px)/3));width:auto;min-height:0}
+ body .blocks-playing .blocks-opponents header{margin-bottom:4px;gap:2px}
  body .blocks-playing .blocks-opponents footer{display:none}
- body .blocks-playing .blocks-controls{width:100%;max-width:none;margin:8px 0 0;gap:10px;flex-shrink:0}
- body .blocks-playing .block-control{min-height:72px;font-size:16px;padding:8px}
- body .blocks-playing .block-control span{font-size:15px}
- body .blocks-playing .blocks-bottom-hint{margin:6px 0 0;line-height:18px;font-size:12px;flex-shrink:0}
- body .blocks-playing .blocks-practice-help{max-width:180px;padding:14px;font-size:13px}
-}
-@media(orientation:landscape) and (min-width:800px) and (min-height:450px){
- body .blocks-playing{display:grid;grid-template-columns:minmax(0,1fr) 164px;grid-template-rows:44px 48px minmax(0,1fr) 24px;gap:0 16px}
- body .blocks-playing>.blocks-top,body .blocks-playing>.blocks-matchbar{grid-column:1/-1}
- body .blocks-playing .blocks-arena{grid-column:1;grid-row:3;justify-content:center;gap:16px}
- body .blocks-playing .blocks-board-wrap>.block-board{height:min(calc(100dvh - 134px),calc((100vw - 420px)*2));width:auto}
- body .blocks-playing .blocks-opponents{flex-direction:row;gap:10px;flex-wrap:wrap;max-width:220px}
- body .blocks-playing .mini-board{height:min(194px,calc((100dvh - 180px)*.4))}
- body .blocks-playing .blocks-controls{grid-column:2;grid-row:3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr;align-self:stretch;margin:0;gap:12px}
- body .blocks-playing .block-control{min-height:64px;max-height:150px;font-size:18px}
- body .blocks-playing .block-control.rotate{grid-column:1/-1}
- body .blocks-playing .block-control svg{width:34px;height:34px}
- body .blocks-playing .blocks-bottom-hint{grid-column:1/-1;grid-row:4;margin:4px 0 0}
+ body .blocks-playing .blocks-controls{width:100%;max-width:800px;justify-self:center;align-self:stretch;margin:0;gap:10px;grid-template-columns:1fr 1fr 1.2fr 1fr 1.3fr}
+ body .blocks-playing .block-control{min-height:0;height:80px;font-size:16px;padding:8px}
+ body .blocks-playing .block-control span{font-size:14px}
+ body .blocks-playing .blocks-bottom-hint{margin:0;line-height:20px;font-size:12px}
+ body .blocks-playing .blocks-practice-help{width:140px;max-width:100%;padding:12px;font-size:13px}
+ body .blocks-playing .blocks-practice-help summary{cursor:pointer;min-height:44px;display:flex;align-items:center;justify-content:center;font-weight:800}
+ body .blocks-playing .blocks-practice-help h2{font-size:15px;margin:8px 0}
+ body .blocks-playing .blocks-practice-help p{font-size:12px;margin:8px 0}
  body .blocks-playing .blocks-notice,body .blocks-playing .connection-warning{position:absolute;top:88px;left:20px;z-index:10}
+ body .blocks-playing>.quick-guide{position:fixed;top:100px;left:50%;transform:translateX(-50%);z-index:20;width:max-content;max-width:calc(100vw - 28px);margin:0}
+}
+@media(orientation:portrait) and (min-width:540px) and (min-height:450px){
+ body .blocks-playing .blocks-arena{grid-template-rows:112px minmax(0,1fr);gap:14px 18px}
+ body .blocks-playing .blocks-board-wrap,body .blocks-playing .blocks-stats{grid-row:2}
+ body .blocks-playing .blocks-board-wrap>.block-board{height:min(calc(100dvh - 364px),calc((100vw - 280px)*2))}
+ body .blocks-playing .blocks-opponents{grid-column:1/-1;grid-row:1;flex-direction:row;justify-self:center;align-self:start;max-width:none;gap:18px}
+ body .blocks-playing .blocks-opponents article{display:flex;align-items:center;gap:8px}
+ body .blocks-playing .blocks-opponents header{order:2;width:72px;margin:0}
+ body .blocks-playing .mini-board{height:106px}
+ body .blocks-playing .blocks-practice-help{width:260px;padding:0 12px}
+ body .blocks-playing .blocks-practice-help[open]{position:absolute;left:50%;transform:translateX(-50%);z-index:10;background:#fffcf6;box-shadow:0 8px 24px #14254822}
 }
