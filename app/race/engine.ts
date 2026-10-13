@@ -24,7 +24,7 @@ export function courseHint(z:number){const sector=courseSector(z),prefix=sector.
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
-export type Racer={id:string;token?:string;name:string;last:number;connection?:{rtt:number;at:number};x:number;z:number;y:number;vy:number;pushVX?:number;pushVZ?:number;at:number;seq:number;checkpoint:number;safeZ?:number;respawnUntil?:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
+export type Racer={id:string;token?:string;name:string;last:number;connection?:{rtt:number;at:number};x:number;z:number;y:number;vy:number;pushVX?:number;pushVZ?:number;jumpUntil?:number;at:number;seq:number;checkpoint:number;safeZ?:number;respawnUntil?:number;falls:number;finished:number;stun:number;bounce:number;peak:number;color:number};
 export type RaceRoom={kind:'race';practice?:boolean;code:string;host:string;players:Racer[];finishers?:Racer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;winner:string};
 export const isRace=(v:unknown):v is RaceRoom=>!!v&&typeof v==='object'&&'kind' in v&&v.kind==='race';
 export function makeRacer(id:string,name:string,now:number,color=0):Racer{return {id,name,last:now,x:0,z:START,y:0,vy:0,at:now,seq:0,checkpoint:0,safeZ:START,respawnUntil:0,falls:0,finished:0,stun:0,bounce:0,peak:0,color};}
@@ -43,7 +43,8 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  if(at>=p.stun){p.x+=c.x/norm*SPEED*dt;p.z+=c.z/norm*SPEED*dt/courseSpeedScale(ox,oz);}
  p.z=Math.max(START,Math.min(FINISH,p.z));
  if(p.y===0&&at>=p.stun)for(const b of BELTS)if(Math.abs(p.z-b.z)<b.d/2)p.x+=b.dir*3.2*dt;
- if(c.jump&&at>=p.stun&&p.y===0&&ground(ox,oz,t))p.vy=9;
+ if(c.jump&&at>=p.stun)p.jumpUntil=at+150;
+ if((p.jumpUntil||0)>=at&&at>=p.stun&&p.y===0&&ground(ox,oz,t)){p.vy=9;p.jumpUntil=0;}
  p.vy-=18*dt;p.y+=p.vy*dt;
  if(p.y<=0&&p.vy<=0&&ground(p.x,p.z,t)){p.y=0;p.vy=0;}
  // Tall walls require steering around the opening, including during bounce jumps.
@@ -71,13 +72,13 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
   const contact=sweptBlade(ox,oz-z,p.x,p.z-z,a-omega*dt,a,length);
   if(!contact)return;
   const direction=Math.sign(p.x)||Math.sign(-Math.sin(a)*(Math.sign(contact.along)||1))||1;
-  p.pushVX=direction*36;p.pushVZ=0;p.vy=3;p.stun=at+3000;
+  p.pushVX=direction*36;p.pushVZ=0;p.jumpUntil=0;p.vy=3;p.stun=at+3000;
  };
  for(const z of GATES)rotatingContact(z,gateAngle(t,z),1.05,5.9);
  for(const z of SPINNERS)rotatingContact(z,spinnerAngle(t,z),2.7,6);
  for(const z of PENDULUMS){const ball=pendulum(t,z);if(Math.hypot(p.x-ball.x,p.z-z)<1.7&&Math.abs(p.y+.9-ball.y)<2&&at>=p.stun){p.x+=(p.x>=ball.x?1:-1)*1.7;p.z-=1.2;p.vy=4;p.stun=at+650;}}
  if(BOUNCERS.some(z=>Math.abs(p.z-z)<1.4)&&Math.abs(p.x)<2.4&&p.y===0&&at>p.bounce){p.vy=12;p.bounce=at+1400;}
- if(p.y< -5){p.x=0;p.z=p.safeZ??START;p.y=0;p.vy=0;p.pushVX=0;p.pushVZ=0;p.falls++;p.stun=0;p.bounce=0;p.respawnUntil=at+RESPAWN_DELAY;return;}
+ if(p.y< -5){p.x=0;p.z=p.safeZ??START;p.y=0;p.vy=0;p.pushVX=0;p.pushVZ=0;p.jumpUntil=0;p.falls++;p.stun=0;p.bounce=0;p.respawnUntil=at+RESPAWN_DELAY;return;}
  if(p.y===0&&safeRecoveryPoint(p.z))p.safeZ=p.z;
  const next=CHECKPOINTS[p.checkpoint];if(next!==undefined&&oz<next&&p.z>=next&&p.y>=0)p.checkpoint++;
 
