@@ -61,8 +61,10 @@ for(let i=0;i<engine.DURATION/engine.STEP&&!p.finished;i++){
  for(const z of engine.GATES)if(p.z>z-7&&p.z<z+5)target=5;
  if(engine.RAFTS.some(([a,b])=>p.z>a-5&&p.z<b+2))target=engine.platformX(engine.raceTime(r,at));
  for(const z of engine.SPINNERS)if(p.z>z-6.5&&p.z<z+6.5)target=6.4;
+ const gap=engine.GAPS.find(([a,b])=>p.z>a-2&&p.z<a),flight=(p.vy+Math.sqrt(p.vy*p.vy+36*Math.max(0,p.y)))/18;
+ const waitForLanding=p.y>0&&gap&&flight*engine.SPEED<gap[1]-p.z+.5;
  let jump=engine.GAPS.some(([a,b])=>p.z>a-2&&p.z<a);
- const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
+ const x=Math.max(-1,Math.min(1,(target-p.x)*2));engine.stepRacer(r,p,{seq:i+1,x,z:waitForLanding||Math.abs(target-p.x)>2.5?0:1,jump},at);engine.advanceRace(r,at);
 }
 assert.ok(p.finished,'course is traversable within the round time: '+JSON.stringify({z:p.z,x:p.x,peak:p.peak,falls:p.falls}));assert.equal(r.phase,'result');
 const f=engine.practiceRace('낙하',clock),q=f.players[0];q.checkpoint=0;q.x=10;q.z=102;q.y=-4.9;q.vy=-5;engine.stepRacer(f,q,{seq:1,x:0,z:0,jump:false},f.start+50);assert.equal(q.z,engine.START);assert.equal(q.checkpoint,0);assert.equal(q.falls,1);
