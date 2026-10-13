@@ -27,7 +27,7 @@ export async function POST(req:Request){try{
   return reply({error:(count?.n||0)>=MAX_ROOMS?'지금은 방이 모두 찼어요. 친구 방에 들어가 주세요.':'새 방은 5초 간격으로 만들 수 있어요. 잠깐 기다려 주세요.'},429);
  }
  const code=String(a.code||'').toUpperCase();if(!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드 6자리를 확인해 주세요.'},400);
- if(a.action==='input'&&(!Array.isArray(a.commands)||a.commands.length>12||a.commands.some((c:{seq:number;key:string})=>!c||!Number.isSafeInteger(c.seq)||c.seq<1||!['left','right','rotate','down','drop'].includes(c.key))))return reply({error:'조작 정보를 다시 확인해 주세요.'},400);
+ if(a.action==='input'&&(!Array.isArray(a.commands)||a.commands.length>12||a.commands.some((c:{seq:number;key:string})=>!c||!Number.isSafeInteger(c.seq)||c.seq<1||!['left','right','rotate','down','drop','item-shield','item-clean','item-attack'].includes(c.key))))return reply({error:'조작 정보를 다시 확인해 주세요.'},400);
  for(let attempt=0;attempt<12;attempt++){
   const row=await db.prepare('SELECT state,version,expires FROM rooms WHERE code=? AND expires>?').bind(code,now).first<{state:string;version:number;expires:number}>();if(!row)return reply({error:'방이 끝났어요. 새 방에 들어가 주세요.'},404);
   const r=JSON.parse(row.state);if(!isBlocks(r))return reply({error:'다른 게임의 방이에요. 게임을 다시 골라 주세요.'},409);
