@@ -1,0 +1,35 @@
+/* Give the player's board the height; keep all five touch controls within reach. */
+@media(min-width:540px) and (min-height:450px){
+ body .blocks-playing{height:100dvh;min-height:0;padding:0 14px 8px;display:flex;flex-direction:column;overflow:hidden}
+ body .blocks-playing>.blocks-top{height:44px;min-height:44px;flex-shrink:0}
+ body .blocks-playing .blocks-matchbar{height:40px;min-height:40px;margin:4px 0 8px;flex-shrink:0}
+ body .blocks-playing .blocks-arena{flex:1;min-height:0;width:100%;max-width:none;gap:20px;align-items:flex-start}
+ body .blocks-playing .blocks-mine{gap:12px;align-items:flex-start}
+ body .blocks-playing .blocks-board-wrap>.block-board{height:min(calc(100dvh - 206px),calc((100vw - 244px)*2));width:auto;max-width:none}
+ body .blocks-playing .blocks-stats{width:72px;gap:5px;padding-top:0}
+ body .blocks-playing .blocks-stats>strong{font-size:23px;margin-bottom:8px}
+ body .blocks-playing .blocks-stats>svg{width:68px;height:50px;margin-bottom:6px}
+ body .blocks-playing .blocks-opponents{flex-direction:column;gap:12px}
+ body .blocks-playing .mini-board{height:min(174px,calc((100dvh - 280px)/3));width:auto}
+ body .blocks-playing .blocks-opponents header{margin-bottom:4px}
+ body .blocks-playing .blocks-opponents footer{display:none}
+ body .blocks-playing .blocks-controls{width:100%;max-width:none;margin:8px 0 0;gap:10px;flex-shrink:0}
+ body .blocks-playing .block-control{min-height:72px;font-size:16px;padding:8px}
+ body .blocks-playing .block-control span{font-size:15px}
+ body .blocks-playing .blocks-bottom-hint{margin:6px 0 0;line-height:18px;font-size:12px;flex-shrink:0}
+ body .blocks-playing .blocks-practice-help{max-width:180px;padding:14px;font-size:13px}
+}
+@media(orientation:landscape) and (min-width:800px) and (min-height:450px){
+ body .blocks-playing{display:grid;grid-template-columns:minmax(0,1fr) 164px;grid-template-rows:44px 48px minmax(0,1fr) 24px;gap:0 16px}
+ body .blocks-playing>.blocks-top,body .blocks-playing>.blocks-matchbar{grid-column:1/-1}
+ body .blocks-playing .blocks-arena{grid-column:1;grid-row:3;justify-content:center;gap:16px}
+ body .blocks-playing .blocks-board-wrap>.block-board{height:min(calc(100dvh - 134px),calc((100vw - 420px)*2));width:auto}
+ body .blocks-playing .blocks-opponents{flex-direction:row;gap:10px;flex-wrap:wrap;max-width:220px}
+ body .blocks-playing .mini-board{height:min(194px,calc((100dvh - 180px)*.4))}
+ body .blocks-playing .blocks-controls{grid-column:2;grid-row:3;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr;align-self:stretch;margin:0;gap:12px}
+ body .blocks-playing .block-control{min-height:64px;max-height:150px;font-size:18px}
+ body .blocks-playing .block-control.rotate{grid-column:1/-1}
+ body .blocks-playing .block-control svg{width:34px;height:34px}
+ body .blocks-playing .blocks-bottom-hint{grid-column:1/-1;grid-row:4;margin:4px 0 0}
+ body .blocks-playing .blocks-notice,body .blocks-playing .connection-warning{position:absolute;top:88px;left:20px;z-index:10}
+}
