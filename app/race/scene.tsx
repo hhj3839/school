@@ -2,8 +2,8 @@
 import {useEffect,useRef,useState} from 'react';
 import * as THREE from 'three';
 import {batchMeshes} from './render-batches';
-import {STAIRCASES,stairTreads} from './stairs';
-import {coursePoint,COURSE_SCALE,ROTATING_HALF,TURNS,NARROWS,SECTORS,courseSector,trackHalfWidth} from './course';
+import {STAIRCASES,stairTreads,inStairZone,stairX} from './stairs';
+import {coursePoint,COURSE_SCALE,TRACK_HALF,ROTATING_HALF,TURNS,NARROWS,SECTORS,courseSector,trackHalfWidth} from './course';
 import {RAFTS,JUMP_ZONES,WALL_HEIGHT,GATES,PENDULUMS,BELTS,BOUNCERS,gateAngle,pendulum,MOVERS,moverX,spinnerAngle,FINISH,GAPS,SPINNERS,WALLS,PALETTE,platformX,raceTime,type RaceRoom} from './engine';
 export function RaceScene({room,id,now,lowPower=false,stateRef,clockRef}:{room:RaceRoom;id:string;now:number;lowPower?:boolean;stateRef?:{current:RaceRoom|null};clockRef?:{current:number}}){
  lowPower=lowPower||room.players.length>=12;
@@ -18,24 +18,25 @@ export function RaceScene({room,id,now,lowPower=false,stateRef,clockRef}:{room:R
  function sphere(x:number,y:number,z:number,r:number,c:string,parent:THREE.Object3D){const g=new THREE.SphereGeometry(r,lowPower?8:12,lowPower?6:8);geometries.push(g);const m=new THREE.Mesh(g,mat(c));if(parent===scene)place(m,x,y,z);else m.position.set(x,y,z);parent.add(m);return m;}
  const water=box(0,-6,0,2200,.3,2200,'#6bbfd6');water.position.set(300,-6,300);
  function ribbon(a:number,b:number,left:number,right:number,low:number,high:number,color:string){const vertices:number[]=[];const quad=(v:number[][])=>{for(const i of [0,1,2,0,2,3])vertices.push(...v[i]);};const point=(x:number,y:number,z:number)=>{const p=coursePoint(x,z);return [p.x,y,p.z];};const n=Math.ceil((b-a)/(lowPower?2*COURSE_SCALE:COURSE_SCALE));for(let i=0;i<n;i++){const z0=a+(b-a)*i/n,z1=a+(b-a)*(i+1)/n,l0=point(left,high,z0),r0=point(right,high,z0),l1=point(left,high,z1),r1=point(right,high,z1),lb0=point(left,low,z0),rb0=point(right,low,z0),lb1=point(left,low,z1),rb1=point(right,low,z1);quad([l0,l1,r1,r0]);quad([rb0,rb1,lb1,lb0]);quad([lb0,lb1,l1,l0]);quad([r0,r1,rb1,rb0]);if(i===0)quad([r0,rb0,lb0,l0]);if(i===n-1)quad([l1,lb1,rb1,r1]);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();geometries.push(g);scene.add(new THREE.Mesh(g,mat(color)));}
- const boundaries=[...new Set([0,FINISH,...GAPS.flat(),...SECTORS.map(s=>s.start),...NARROWS.flatMap(n=>[n.start,n.end])])].sort((a,b)=>a-b);
- for(let i=0;i<boundaries.length-1;i++){const a=boundaries[i],b=boundaries[i+1],mid=(a+b)/2;if(GAPS.some(([lo,hi])=>mid>lo&&mid<hi))continue;const w=trackHalfWidth(mid);ribbon(a,b,-w,w,-1.2,0,w<7?'#b7dfcc':courseSector(mid).color);ribbon(a,b,-w,-w+.3,0,.2,'#f6b39a');ribbon(a,b,w-.3,w,0,.2,'#f6b39a');for(let z=a+1;z<b;z+=lowPower?8*COURSE_SCALE:4*COURSE_SCALE)box(0,.008,z,w*2-.4,.015,.06,'#e8c991');}
- // Stairs are static, batched terrain. Both height and tread boundaries use physics data.
- for(const tread of stairTreads()){
-  const width=trackHalfWidth((tread.start+tread.end)/2);
-  ribbon(tread.start,tread.end,-width,width,0,tread.height,tread.height>3?'#b2a0e1':tread.height>2?'#f3cd80':'#8fd2c9');
-  ribbon(tread.start,tread.start+.2,-width,width,tread.height,tread.height+.04,'#fff5be');
- }
+ const boundaries=[...new Set([0,FINISH,...GAPS.flat(),...STAIRCASES.flatMap(s=>[s.start,s.start+s.depth*s.heights.length]),...SECTORS.map(s=>s.start),...NARROWS.flatMap(n=>[n.start,n.end])])].sort((a,b)=>a-b);
+ for(let i=0;i<boundaries.length-1;i++){const a=boundaries[i],b=boundaries[i+1],mid=(a+b)/2;if(inStairZone(mid)||GAPS.some(([lo,hi])=>mid>lo&&mid<hi))continue;const w=trackHalfWidth(mid);ribbon(a,b,-w,w,-1.2,0,w<7?'#b7dfcc':courseSector(mid).color);ribbon(a,b,-w,-w+.3,0,.2,'#f6b39a');ribbon(a,b,w-.3,w,0,.2,'#f6b39a');for(let z=a+1;z<b;z+=lowPower?8*COURSE_SCALE:4*COURSE_SCALE)box(0,.008,z,w*2-.4,.015,.06,'#e8c991');}
+ const movingStairs=stairTreads().map(tread=>{
+  const mesh=new THREE.Group();place(mesh,stairX(0,tread),0,(tread.start+tread.end)/2);scene.add(mesh);
+  const depth=tread.end-tread.start;
+  box(0,tread.height-.3,0,TRACK_HALF*2,.6,depth,tread.height>3?'#b2a0e1':tread.height>2?'#f3cd80':'#8fd2c9',mesh);
+  box(0,tread.height+.025,-depth/2+.15,TRACK_HALF*2-.2,.05,.3,'#fff5be',mesh);
+  batchMeshes(mesh,new Set(),geometries);return {tread,mesh};
+ });
  for(const stair of STAIRCASES){
   box(0,.025,stair.start-2.5,13.6,.05,.4,'#f6c743');
   const arrow=new THREE.Group();place(arrow,0,.08,stair.start-4.5);scene.add(arrow);
   box(0,0,-.5,.42,.06,1.7,'#f6bd2e',arrow);const a=box(-.4,0,.05,.24,.06,1.25,'#f6bd2e',arrow),b=box(.4,0,.05,.24,.06,1.25,'#f6bd2e',arrow);a.rotation.y=.8;b.rotation.y=-.8;
  }
  // Direction chevrons are part of the track, including the approach to each bend.
- for(const turn of TURNS){for(let z=turn.start-4;z<turn.end;z+=6*COURSE_SCALE){if(GAPS.some(([a,b])=>z>a&&z<b))continue;const left=box(-.45,.04,z,.2,.05,1.3,'#fffdf0'),right=box(.45,.04,z,.2,.05,1.3,'#fffdf0');left.rotation.y+=.7;right.rotation.y-=.7;}const sign=new THREE.Group();place(sign,-8,0,turn.start-3);scene.add(sign);box(0,1.3,0,.18,2.6,.18,'#fffdf0',sign);box(0,2.6,0,2.4,1.4,.15,'#65b7c7',sign);box(0,2.6,-.1,1.5,.15,.08,'#fffdf0',sign);const tip=box(turn.angle>0?.6:-.6,2.6,-.1,.6,.6,.08,'#fffdf0',sign);tip.rotation.z=Math.PI/4;}
+ for(const turn of TURNS){for(let z=turn.start-4;z<turn.end;z+=6*COURSE_SCALE){if(inStairZone(z)||GAPS.some(([a,b])=>z>a&&z<b))continue;const left=box(-.45,.04,z,.2,.05,1.3,'#fffdf0'),right=box(.45,.04,z,.2,.05,1.3,'#fffdf0');left.rotation.y+=.7;right.rotation.y-=.7;}const sign=new THREE.Group();place(sign,-8,0,turn.start-3);scene.add(sign);box(0,1.3,0,.18,2.6,.18,'#fffdf0',sign);box(0,2.6,0,2.4,1.4,.15,'#65b7c7',sign);box(0,2.6,-.1,1.5,.15,.08,'#fffdf0',sign);const tip=box(turn.angle>0?.6:-.6,2.6,-.1,.6,.6,.08,'#fffdf0',sign);tip.rotation.z=Math.PI/4;}
  for(const [a,b] of GAPS){const c=RAFTS.some(([r])=>r===a)?'#9a91df':'#f6c743';box(0,.015,a-.3,trackHalfWidth(a-.3)*2,.04,.4,c);box(0,.015,b+.3,trackHalfWidth(b+.3)*2,.04,.4,c);}
  for(const z of JUMP_ZONES){const w=trackHalfWidth(z);for(const x of (w<4?[0]:[-4,0,4])){const g=new THREE.Group();place(g,x,.08,z);scene.add(g);box(0,0,-.5,.42,.06,1.7,'#f6bd2e',g);const a=box(-.4,0,.05,.24,.06,1.25,'#f6bd2e',g),b=box(.4,0,.05,.24,.06,1.25,'#f6bd2e',g);a.rotation.y=.8;b.rotation.y=-.8;}}
- const rafts=RAFTS.map(([a,b])=>{const z=(a+b)/2,mesh=box(0,-.35,z,5.6,.7,b-a+.2,'#9a91df');for(let dz=-3;dz<4;dz+=2)box(0,.37,dz,5.2,.04,.18,'#d4cef4',mesh);return {z,mesh};});
+ const rafts=RAFTS.map(([a,b])=>{const z=(a+b)/2,mesh=box(0,-.35,z,TRACK_HALF*2,.7,b-a+.2,'#9a91df');for(let dz=-3;dz<4;dz+=2)box(0,.37,dz,TRACK_HALF*2-.4,.04,.18,'#d4cef4',mesh);return {z,mesh};});
  function wall(x:number,z:number,w:number,moving=false){const group=new THREE.Group();place(group,x,0,z);scene.add(group);box(0,WALL_HEIGHT/2,0,w,WALL_HEIGHT,1.4,moving?'#9e92db':'#efa888',group);box(0,WALL_HEIGHT+.04,0,w,.08,1.4,moving?'#d9d2fc':'#ffe0c2',group);for(let y=.5;y<WALL_HEIGHT;y+=1)box(0,y,-.71,w,.12,.03,moving?'#c8bfee':'#ffcaac',group);return group;}
  WALLS.forEach(w=>wall(w.x,w.z,w.w));const movingWalls=MOVERS.map(z=>{box(0,.025,z,13,.05,1.6,'#d6caf1');return wall(0,z,5,true);});
  const doors=GATES.map(z=>{const g=new THREE.Group();place(g,0,0,z);scene.add(g);box(0,2.5,0,.4,5,.4,'#546f90',g);for(const x of [-ROTATING_HALF/2,ROTATING_HALF/2]){box(x,2.5,0,ROTATING_HALF,5,.4,'#71c9d2',g);box(x,2.5,-.23,ROTATING_HALF-.6,.22,.04,'#defbfb',g);}return g;});
@@ -46,7 +47,7 @@ export function RaceScene({room,id,now,lowPower=false,stateRef,clockRef}:{room:R
 
  for(let i=0;i<14;i++)for(let j=0;j<2;j++)box(i-6.5,.03,FINISH+j*.6,1,.05,.6,(i+j)%2?'#49647e':'#fffdf4');
  box(-6,2.6,FINISH,.5,5.2,.5,'#f7a6ab');box(6,2.6,FINISH,.5,5.2,.5,'#f7a6ab');box(0,5.2,FINISH,12.5,.8,.6,'#f7a6ab');
- batchMeshes(scene,new Set<THREE.Object3D>([...rafts.map(r=>r.mesh),...movingWalls,...doors,...beams,...swings.flatMap(s=>[s.ball,s.rope]),...belts.flatMap(b=>b.stripes)]),geometries);
+ batchMeshes(scene,new Set<THREE.Object3D>([...movingStairs.map(s=>s.mesh),...rafts.map(r=>r.mesh),...movingWalls,...doors,...beams,...swings.flatMap(s=>[s.ball,s.rope]),...belts.flatMap(b=>b.stripes)]),geometries);
  const avatars=new Map<string,THREE.Group>();const projected=new THREE.Vector3(),scratchGoal=new THREE.Vector3(),scratchDelta=new THREE.Vector3(),up=new THREE.Vector3(0,1,0);
  function avatar(key:string,color:number){const a=new THREE.Group(),c=PALETTE[color%PALETTE.length];sphere(0,.9,0,.65,c,a);sphere(0,1.6,0,.55,c,a);sphere(-.22,1.7,.46,.105,'#344e59',a);sphere(.22,1.7,.46,.105,'#344e59',a);sphere(-.3,.23,0,.23,'#fff8e8',a);sphere(.3,.23,0,.23,'#fff8e8',a);box(0,1.05,-.51,.8,.6,.2,'#fff2bd',a);batchMeshes(a,new Set(),geometries);scene.add(a);avatars.set(key,a);return a;}
  const recoveryGeometry=new THREE.RingGeometry(1.2,1.8,40);geometries.push(recoveryGeometry);const recoveryMaterial=new THREE.MeshBasicMaterial({color:'#84ffdc',transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false});const recoveryRing=new THREE.Mesh(recoveryGeometry,recoveryMaterial);recoveryRing.rotation.x=-Math.PI/2;scene.add(recoveryRing);recoveryRing.visible=false;
@@ -54,6 +55,7 @@ export function RaceScene({room,id,now,lowPower=false,stateRef,clockRef}:{room:R
  let measuredAt=performance.now(),measuredFrames=0,lastQualityChange=0;let raf=0;const resize=()=>{const {width,height}=el.getBoundingClientRect();renderer.setSize(width,height);camera.aspect=width/Math.max(1,height);camera.updateProjectionMatrix();};const observer=new ResizeObserver(resize);observer.observe(el);resize();
  const render=()=>{const frameNow=performance.now();if((document.hidden&&frameNow-frameAt<500)||(lowPower&&frameNow-frameAt<1000/30-.5)){raf=requestAnimationFrame(render);return;}const frameGap=(frameNow-frameAt)/1000,frameDt=Math.min(.1,frameGap);frameAt=frameNow;const latest=live.current,r=stateRef?.current||latest.room,id=latest.id,now=clockRef?Date.now()+clockRef.current:latest.now,received=latest.received,targetTime=raceTime(r,now+(clockRef?0:Math.min(100,Math.max(0,frameNow-received))));if(visualRound!==r.round||frameGap>.25||r.paused||r.phase!=='playing'||now<r.start){visualTime=raceTime(r,now);visualRound=r.round;}else{const error=targetTime-(visualTime+frameDt);visualTime+=Math.max(0,frameDt+Math.max(-frameDt*.25,Math.min(frameDt*.25,error*.12)));}const t=visualTime,me=r.players.find(p=>p.id===id)||r.players[0],focus=me?.finished?(r.players.find(p=>!p.finished)||me):me;
   const recovering=!!me&&(me.respawnUntil||0)>(r.paused||now);recoveryRing.visible=recovering||!!me&&me.y<0;if(me&&recoveryRing.visible){const mark=coursePoint(0,me.safeZ??0);recoveryRing.position.set(mark.x,.12,mark.z);recoveryRing.scale.setScalar(1+Math.sin(t*6)*.12);}
+  movingStairs.forEach(({tread,mesh})=>place(mesh,stairX(t,tread),0,(tread.start+tread.end)/2));
   beams.forEach((b,i)=>b.rotation.y=coursePoint(0,SPINNERS[i]).heading-spinnerAngle(t,SPINNERS[i]));rafts.forEach(({z,mesh})=>place(mesh,platformX(t),-.35,z));movingWalls.forEach((w,i)=>place(w,moverX(t,MOVERS[i]),0,MOVERS[i]));
   doors.forEach((g,i)=>g.rotation.y=coursePoint(0,GATES[i]).heading-gateAngle(t,GATES[i]));
   swings.forEach(({ball,rope,z})=>{const p=pendulum(t,z);place(ball,p.x,p.y,z);const anchor=coursePoint(0,z),end=coursePoint(p.x,z);rope.position.set((anchor.x+end.x)/2,(p.y+7)/2,(anchor.z+end.z)/2);const delta=scratchDelta.set(end.x-anchor.x,p.y-7,end.z-anchor.z);rope.scale.y=delta.length();rope.quaternion.setFromUnitVectors(up,delta.normalize());});
