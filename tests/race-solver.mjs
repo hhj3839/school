@@ -1,3 +1,4 @@
+const {stairTreads}=await import('../app/race/stairs.ts');
 // Test driver uses only real movement inputs; it waits for a safe blade phase.
 export function completeCourse(e,r){const p=r.players[0];let at=r.start,committed=0,falls=p.falls;const rotors=[...e.SPINNERS,...e.GATES].sort((a,b)=>a-b);
  for(let i=0;i<e.DURATION/e.STEP&&!p.finished;i++){
@@ -14,7 +15,8 @@ export function completeCourse(e,r){const p=r.players[0];let at=r.start,committe
   if(e.RAFTS.some(([a,b])=>p.z>a-5&&p.z<b+2))target=e.platformX(e.raceTime(r,at));
   const gap=e.GAPS.find(([a])=>p.z>a-2&&p.z<a),flight=(p.vy+Math.sqrt(p.vy*p.vy+36*Math.max(0,p.y)))/18;
   const waitForLanding=p.y>0&&gap&&flight*e.SPEED<gap[1]-p.z+.5;
-  e.stepRacer(r,p,{seq:i+1,x:Math.max(-1,Math.min(1,(target-p.x)*2)),z:wait||waitForLanding||Math.abs(target-p.x)>2.5?0:1,jump:e.GAPS.some(([a])=>p.z>a-2&&p.z<a)},at);e.advanceRace(r,at);
+  const floor=e.surfaceHeight(p.x,p.z,e.raceTime(r,at)),stairJump=stairTreads().some(t=>t.up&&t.start>=p.z&&t.start-p.z<1.5)&&floor!==null&&Math.abs(p.y-floor)<.001&&p.vy<=0;
+  e.stepRacer(r,p,{seq:i+1,x:Math.max(-1,Math.min(1,(target-p.x)*2)),z:wait||waitForLanding||Math.abs(target-p.x)>2.5?0:1,jump:stairJump||e.GAPS.some(([a])=>p.z>a-2&&p.z<a)},at);e.advanceRace(r,at);
  }
  return {finished:!!p.finished,seconds:Math.round((at-r.start)/1000),z:p.z,falls:p.falls,peak:p.peak};
 }

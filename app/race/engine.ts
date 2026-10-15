@@ -1,4 +1,5 @@
 import {sweptBlade} from './collision';
+import {STAIRCASES,stairHeight} from './stairs';
 import {COURSE_LENGTH,COURSE_SCALE,SECTOR_LENGTH,SPINNER_POSITIONS,GATE_POSITIONS,ROTATING_HALF,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
 export const FINISH=COURSE_LENGTH,STEP=50,DURATION=480000,CAPACITY=20;
 export const INPUT_LIMIT=24,INPUT_WINDOW=STEP*INPUT_LIMIT;
@@ -22,7 +23,7 @@ export const BELTS=[{z:552,d:6,dir:1},{z:702,d:7,dir:-1},{z:780,d:6,dir:1}].map(
 export const BOUNCERS=[295,377,832].map(z=>z*COURSE_SCALE);
 export const gateAngle=(time:number,z:number)=>time*GATE_RATE+z;
 export function pendulum(time:number,z:number){const x=Math.sin(time*2.0+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
-export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if([...SPINNERS,...GATES].some(at=>Math.abs(z-at)<14))return prefix+'가장자리는 낭떠러지! 회전벽의 빈틈을 보고 통과해요';if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<SECTOR_LENGTH)return prefix+'회전벽은 타이밍을 보고 통과해요';if(z<SECTOR_LENGTH*2)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<SECTOR_LENGTH*3)return prefix+'흔들리는 공을 피하고 좁은 길 가운데로!';return prefix+'움직이는 장치를 피하고 결승선까지!';}
+export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(STAIRCASES.some(s=>z>s.start-12&&z<s.start+s.depth*s.heights.length+3))return prefix+'점프 계단! 한 칸씩 올라가서 반대편으로 내려가요';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if([...SPINNERS,...GATES].some(at=>Math.abs(z-at)<14))return prefix+'가장자리는 낭떠러지! 회전벽의 빈틈을 보고 통과해요';if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<SECTOR_LENGTH)return prefix+'회전벽은 타이밍을 보고 통과해요';if(z<SECTOR_LENGTH*2)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<SECTOR_LENGTH*3)return prefix+'흔들리는 공을 피하고 좁은 길 가운데로!';return prefix+'움직이는 장치를 피하고 결승선까지!';}
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
@@ -35,10 +36,11 @@ export function startRace(r:RaceRoom,now:number){r.round++;r.finishers=[];r.phas
 export function raceTime(r:RaceRoom,now:number){return Math.max(0,((r.paused||now)-r.start)/1000);}
 export function platformX(time:number){return Math.sin(time*.8)*3.5;}
 export function ground(x:number,z:number,time:number){if(Math.abs(x)>trackHalfWidth(z)||z< -3||z>FINISH+8)return false;for(const [a,b] of GAPS)if(z>a&&z<b)return RAFTS.some(([start])=>start===a)&&Math.abs(x-platformX(time))<2.8;return true;}
-export function safeRecoveryPoint(z:number){return z>=START&&z<FINISH-5&&trackHalfWidth(z)===7&&!GAPS.some(([a,b])=>z>a-3&&z<b+3)&&![...SPINNERS,...GATES].some(at=>Math.abs(z-at)<7)&&![...MOVERS,...WALLS.map(w=>w.z),...PENDULUMS,...BOUNCERS].some(at=>Math.abs(z-at)<4)&&!BELTS.some(b=>Math.abs(z-b.z)<b.d/2+1);}
+export function surfaceHeight(x:number,z:number,time:number):number|null{return ground(x,z,time)?stairHeight(z):null;}
+export function safeRecoveryPoint(z:number){return !STAIRCASES.some(s=>z>s.start-2&&z<s.start+s.depth*s.heights.length+2)&&z>=START&&z<FINISH-5&&trackHalfWidth(z)===7&&!GAPS.some(([a,b])=>z>a-3&&z<b+3)&&![...SPINNERS,...GATES].some(at=>Math.abs(z-at)<7)&&![...MOVERS,...WALLS.map(w=>w.z),...PENDULUMS,...BOUNCERS].some(at=>Math.abs(z-at)<4)&&!BELTS.some(b=>Math.abs(z-b.z)<b.d/2+1);}
 export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  if(r.phase!=='playing'||r.paused||at<r.start||at>r.end||p.finished||at<(p.respawnUntil||0))return;
- const dt=STEP/1000,t=raceTime(r,at),norm=Math.max(1,Math.hypot(c.x,c.z)),ox=p.x,oz=p.z;
+ const dt=STEP/1000,t=raceTime(r,at),norm=Math.max(1,Math.hypot(c.x,c.z)),ox=p.x,oz=p.z,oy=p.y,oldFloor=surfaceHeight(p.x,p.z,t),grounded=oldFloor!==null&&Math.abs(p.y-oldFloor)<.001&&p.vy<=0;
  // Brief momentum lets a moving wall carry a player beyond the road edge.
  p.x+=(p.pushVX||0)*dt;p.z+=(p.pushVZ||0)*dt/courseSpeedScale(ox,oz);p.pushVX=(p.pushVX||0)*.86;p.pushVZ=(p.pushVZ||0)*.86;
  if(Math.abs(p.pushVX)<.05)p.pushVX=0;
@@ -46,9 +48,12 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  p.z=Math.max(START,Math.min(FINISH,p.z));
  if(p.y===0&&at>=p.stun)for(const b of BELTS)if(Math.abs(p.z-b.z)<b.d/2)p.x+=b.dir*3.2*dt;
  if(c.jump&&at>=p.stun)p.jumpUntil=at+150;
- if((p.jumpUntil||0)>=at&&at>=p.stun&&p.y===0&&ground(ox,oz,t)){p.vy=9;p.jumpUntil=0;}
+ if((p.jumpUntil||0)>=at&&at>=p.stun&&grounded){p.vy=9;p.jumpUntil=0;}
  p.vy-=18*dt;p.y+=p.vy*dt;
- if(p.y<=0&&p.vy<=0&&p.y-p.vy*dt>=0&&ground(p.x,p.z,t)){p.y=0;p.vy=0;}
+ let floor=surfaceHeight(p.x,p.z,t);
+ // A higher step is a solid face. Walking into it cannot lift or teleport a racer.
+ if(floor!==null&&floor>(oldFloor??0)+.001&&p.y<floor&&oy<floor){p.x=ox;p.z=oz;floor=oldFloor;}
+ if(floor!==null&&p.y<=floor&&p.vy<=0&&oy>=floor-.001){p.y=floor;p.vy=0;}
  // Tall walls require steering around the opening, including during bounce jumps.
  for(const w of WALLS){
   if(p.y>=WALL_HEIGHT)continue;
