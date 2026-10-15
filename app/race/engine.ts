@@ -1,4 +1,5 @@
 import {sweptBlade} from './collision';
+import {FADING_BRIDGES,inFadingZone,fadingGround,SHUTTERS,shutterState,PUNCHES,punchState} from './obstacles';
 import {STAIRCASES,inStairZone,stairSupport,stairX} from './stairs';
 import {COURSE_LENGTH,COURSE_SCALE,SECTOR_LENGTH,SPINNER_POSITIONS,GATE_POSITIONS,ROTATING_HALF,ROTATING_APPROACH,TRACK_HALF,coursePoint,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
 export const FINISH=COURSE_LENGTH,STEP=50,DURATION=480000,CAPACITY=20;
@@ -23,7 +24,7 @@ export const BELTS=[{z:552,d:6,dir:1},{z:702,d:7,dir:-1},{z:780,d:6,dir:1}].map(
 export const BOUNCERS=[295,377,832].map(z=>z*COURSE_SCALE);
 export const gateAngle=(time:number,z:number)=>time*GATE_RATE+z;
 export function pendulum(time:number,z:number){const x=Math.sin(time*2.0+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
-export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(STAIRCASES.some(s=>z>s.start-12&&z<s.start+s.depth*s.heights.length+3))return prefix+'움직이는 계단! 발판을 보고 점프, 틈에 빠지면 떨어져요';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if([...SPINNERS,...GATES].some(at=>Math.abs(z-at)<14))return prefix+'회전벽은 길 전체를 지나가요! 타이밍을 보고 통과해요';if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<SECTOR_LENGTH)return prefix+'회전벽은 타이밍을 보고 통과해요';if(z<SECTOR_LENGTH*2)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<SECTOR_LENGTH*3)return prefix+'흔들리는 공과 끊긴 길을 조심해요';return prefix+'움직이는 장치를 피하고 결승선까지!';}
+export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(FADING_BRIDGES.some(b=>z>b.start-12&&z<b.start+b.tileDepth*b.tiles+3))return prefix+'초록 발판에 건너요! 노랑은 곧 사라져요. 다시 나타날 때까지 기다려요';if(SHUTTERS.some(at=>Math.abs(z-at)<12))return prefix+'셔터가 올라가면 통과! 노란불은 곧 닫혀요';if(PUNCHES.some(p=>Math.abs(z-p.z)<12))return prefix+'빨간 경고등! 펀치가 들어간 뒤 통과해요';if(STAIRCASES.some(s=>z>s.start-12&&z<s.start+s.depth*s.heights.length+3))return prefix+'움직이는 계단! 발판을 보고 점프, 틈에 빠지면 떨어져요';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if([...SPINNERS,...GATES].some(at=>Math.abs(z-at)<14))return prefix+'회전벽은 길 전체를 지나가요! 타이밍을 보고 통과해요';if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<SECTOR_LENGTH)return prefix+'회전벽은 타이밍을 보고 통과해요';if(z<SECTOR_LENGTH*2)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<SECTOR_LENGTH*3)return prefix+'흔들리는 공과 끊긴 길을 조심해요';return prefix+'움직이는 장치를 피하고 결승선까지!';}
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
@@ -38,11 +39,12 @@ export function platformX(time:number){return Math.sin(time*.8)*3.5;}
 export function ground(x:number,z:number,time:number){
  if(z< -3||z>FINISH+8)return false;
  if(inStairZone(z))return !!stairSupport(x,z,time);
+ if(inFadingZone(z))return Math.abs(x)<=TRACK_HALF&&fadingGround(z,time);
  for(const [a,b] of GAPS)if(z>a&&z<b)return RAFTS.some(([start])=>start===a)&&Math.abs(x-platformX(time))<=TRACK_HALF;
  return Math.abs(x)<=trackHalfWidth(z);
 }
 export function surfaceHeight(x:number,z:number,time:number):number|null{if(inStairZone(z))return stairSupport(x,z,time)?.height??null;return ground(x,z,time)?0:null;}
-export function safeRecoveryPoint(z:number){return !STAIRCASES.some(s=>z>s.start-2&&z<s.start+s.depth*s.heights.length+2)&&z>=START&&z<FINISH-5&&trackHalfWidth(z)===7&&!GAPS.some(([a,b])=>z>a-3&&z<b+3)&&![...SPINNERS,...GATES].some(at=>Math.abs(z-at)<ROTATING_APPROACH)&&![...MOVERS,...WALLS.map(w=>w.z),...PENDULUMS,...BOUNCERS].some(at=>Math.abs(z-at)<4)&&!BELTS.some(b=>Math.abs(z-b.z)<b.d/2+1);}
+export function safeRecoveryPoint(z:number){return !FADING_BRIDGES.some(b=>z>b.start-3&&z<b.start+b.tileDepth*b.tiles+3)&&!SHUTTERS.some(at=>Math.abs(z-at)<4)&&!PUNCHES.some(p=>Math.abs(z-p.z)<7)&&!STAIRCASES.some(s=>z>s.start-2&&z<s.start+s.depth*s.heights.length+2)&&z>=START&&z<FINISH-5&&trackHalfWidth(z)===7&&!GAPS.some(([a,b])=>z>a-3&&z<b+3)&&![...SPINNERS,...GATES].some(at=>Math.abs(z-at)<ROTATING_APPROACH)&&![...MOVERS,...WALLS.map(w=>w.z),...PENDULUMS,...BOUNCERS].some(at=>Math.abs(z-at)<4)&&!BELTS.some(b=>Math.abs(z-b.z)<b.d/2+1);}
 export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
  if(r.phase!=='playing'||r.paused||at<r.start||at>r.end||p.finished||at<(p.respawnUntil||0))return;
  const dt=STEP/1000,t=raceTime(r,at),norm=Math.max(1,Math.hypot(c.x,c.z)),ox=p.x,oz=p.z,oy=p.y,oldFloor=surfaceHeight(p.x,p.z,t-dt),grounded=oldFloor!==null&&Math.abs(p.y-oldFloor)<.001&&p.vy<=0;
@@ -81,6 +83,14 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
   if(Math.abs(oz-z)>=1.05){p.z=oz;continue;}
   if(Math.abs(delta)>.00001&&(ox-previous)*Math.sign(delta)>=0){const direction=Math.sign(delta);p.x=current+direction*(half+.01);p.pushVX=delta/dt;}
   else p.x=current+(ox>=current?1:-1)*(half+.01);
+ }
+ // Shutters block the full road until the opening clears the racer's body.
+ for(const z of SHUTTERS){const bottom=Math.min(shutterState(t,z).bottom,shutterState(t-dt,z).bottom);
+  if(Math.abs(p.z-z)<1.05&&p.y<bottom+5&&p.y+2.2>bottom){p.z=oz<=z?Math.min(oz,z-1.06):Math.max(oz,z+1.06);}
+ }
+ for(const punch of PUNCHES){const current=punchState(t,punch.z),previous=punchState(t-dt,punch.z);if(Math.max(current.extension,previous.extension)<=0||p.y< -1||p.y>=2.8||Math.abs(p.z-punch.z)>1.6||at<p.stun)continue;
+  const a=punch.side*(9-17*previous.extension),b=punch.side*(9-17*current.extension);
+  if(Math.max(ox,p.x)>=Math.min(a,b)-1.7&&Math.min(ox,p.x)<=Math.max(a,b)+1.7){p.pushVX=-punch.side*36;p.pushVZ=0;p.jumpUntil=0;p.vy=3;p.stun=at+3000;}
  }
  // A rotating-wall hit throws the racer off the nearest side; input cannot undo the hit.
  const rotatingContact=(z:number,a:number,omega:number,length:number)=>{

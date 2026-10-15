@@ -5,10 +5,10 @@ export const STAGES=[0,1,2,3].map(i=>i*SECTOR_LENGTH);
 // Four identical sectors, each turning 90 degrees, close the circuit exactly.
 export const TURNS=STAGES.flatMap(offset=>[[34,58],[104,128],[170,194]].map(([a,b])=>({start:offset+a*COURSE_SCALE,end:offset+b*COURSE_SCALE,angle:Math.PI/6,label:'왼쪽 커브'})));
 export const CHECKPOINTS=[110,220,330,440,550,660,770].map(z=>z*COURSE_SCALE);
-export const SECTORS=[{start:0,end:220,name:'회전문 피하기',color:'#e6dcfa'},{start:220,end:440,name:'발판과 점프',color:'#fff0b5'},{start:440,end:660,name:'흔들리는 장치',color:'#cceee1'},{start:660,end:880,name:'마지막 질주',color:'#ffdccd'}].map(s=>({...s,start:s.start*COURSE_SCALE,end:s.end*COURSE_SCALE}));
+export const SECTORS=[{start:0,end:220,name:'타이밍 장애물',color:'#e6dcfa'},{start:220,end:440,name:'발판과 점프',color:'#fff0b5'},{start:440,end:660,name:'흔들리는 장치',color:'#cceee1'},{start:660,end:880,name:'마지막 질주',color:'#ffdccd'}].map(s=>({...s,start:s.start*COURSE_SCALE,end:s.end*COURSE_SCALE}));
 export function courseSector(z:number){return SECTORS[Math.min(3,Math.max(0,Math.floor(z/SECTOR_LENGTH)))];}
-export const SPINNER_POSITIONS=[20,64,112,158,196,726,812].map(z=>z*COURSE_SCALE);
-export const GATE_POSITIONS=[88,136,180,762].map(z=>z*COURSE_SCALE);
+export const SPINNER_POSITIONS=[64,726].map(z=>z*COURSE_SCALE);
+export const GATE_POSITIONS=[136,762].map(z=>z*COURSE_SCALE);
 export const TRACK_HALF=7,ROTATING_HALF=8,ROTATING_APPROACH=11;
 export const NARROWS:{start:number;end:number;halfWidth:number}[]=[];
 export function trackHalfWidth(_z:number){return TRACK_HALF;}

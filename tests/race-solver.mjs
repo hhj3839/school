@@ -1,9 +1,10 @@
+const {FADING_BRIDGES,PUNCHES}=await import('../app/race/obstacles.ts');
 const {stairTreads,stairX}=await import('../app/race/stairs.ts');
 // Test driver uses only real movement inputs; it waits for a safe blade phase.
-export function completeCourse(e,r){const p=r.players[0];let at=r.start,committed=0,falls=p.falls;const rotors=[...e.SPINNERS,...e.GATES].sort((a,b)=>a-b);
+export function completeCourse(e,r){const p=r.players[0];let at=r.start,committed=0,falls=p.falls,timedCommit=-1;const rotors=[...e.SPINNERS,...e.GATES].sort((a,b)=>a-b);
  for(let i=0;i<e.DURATION/e.STEP&&!p.finished;i++){
   at+=e.STEP;p.last=at;let target=0,wait=false;
-  if(p.falls!==falls){committed=0;falls=p.falls;}
+  if(p.falls!==falls){committed=0;timedCommit=-1;falls=p.falls;}
   const nextWall=[...e.WALLS,...e.MOVERS.map(z=>({x:e.moverX(e.raceTime(r,at),z),z,w:5}))].filter(w=>w.z>p.z-1.1).sort((a,b)=>a.z-b.z)[0];
   if(nextWall&&nextWall.z-p.z<8)target=nextWall.x<0?5:-5;
   const rotor=rotors.find(z=>p.z>z-18&&p.z<z+10);
@@ -12,6 +13,12 @@ export function completeCourse(e,r){const p=r.players[0];let at=r.start,committe
    for(let j=0;j<100&&q.z<rotor+9.5;j++){e.stepRacer(probe,q,{seq:j+1,x:Math.max(-1,Math.min(1,(target-q.x)*2)),z:1,jump:false},at+j*e.STEP);if(q.falls!==oldFalls||q.stun>at+j*e.STEP){ok=false;break;}}
    if(ok&&q.z>=rotor+9.5)committed=rotor;else wait=true;
   }}else committed=0;
+  const timed=[...FADING_BRIDGES.map(b=>({start:b.start,end:b.start+b.tileDepth*b.tiles})),...PUNCHES.map(p=>({start:p.z-2,end:p.z+2}))].find(d=>p.z>d.start-12&&p.z<d.end+2);
+  if(timed&&p.z>=timed.start-3.5&&timedCommit!==timed.start){
+   const probe=structuredClone(r),q=probe.players[0],oldFalls=q.falls;let ok=true;
+   for(let j=0;j<120&&q.z<timed.end+2;j++){e.stepRacer(probe,q,{seq:j+1,x:Math.max(-1,Math.min(1,-q.x*2)),z:1,jump:false},at+j*e.STEP);if(q.falls!==oldFalls||q.stun>at+j*e.STEP){ok=false;break;}}
+   if(ok&&q.z>=timed.end+2)timedCommit=timed.start;else wait=true;
+  }
   if(e.RAFTS.some(([a,b])=>p.z>a-5&&p.z<b+2))target=e.platformX(e.raceTime(r,at));
   const gap=e.GAPS.find(([a])=>p.z>a-2&&p.z<a),flight=(p.vy+Math.sqrt(p.vy*p.vy+36*Math.max(0,p.y)))/18;
   const waitForLanding=p.y>0&&gap&&flight*e.SPEED<gap[1]-p.z+.5;
