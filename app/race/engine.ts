@@ -1,28 +1,28 @@
 import {sweptBlade} from './collision';
-import {COURSE_LENGTH,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
+import {COURSE_LENGTH,COURSE_SCALE,SECTOR_LENGTH,SPINNER_POSITIONS,GATE_POSITIONS,ROTATING_HALF,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
 export const FINISH=COURSE_LENGTH,STEP=50,DURATION=480000,CAPACITY=20;
 export const INPUT_LIMIT=24,INPUT_WINDOW=STEP*INPUT_LIMIT;
 export const SPEED=13.5;
-export const RAFTS=[[265,277],[337,349],[389,401]];
+export const RAFTS=[[265,277],[337,349],[389,401]].map(([a,b])=>[a*COURSE_SCALE,a*COURSE_SCALE+(b-a)]);
 export const RAFT=RAFTS[0];
-export const GAPS=[...RAFTS,[305,314],[423,432],[499,508],[590,599],[741,750],[839,848]].sort((a,b)=>a[0]-b[0]);
+export const GAPS=[...RAFTS,...[[305,314],[423,432],[499,508],[590,599],[741,750],[839,848]].map(([a,b])=>[a*COURSE_SCALE,a*COURSE_SCALE+(b-a)])].sort((a,b)=>a[0]-b[0]);
 export const JUMP_ZONES=GAPS.filter(([a])=>!RAFTS.some(([r])=>r===a)).map(([a])=>a-2);
 export const START=0;
 export const RESPAWN_DELAY=3000;
 export const WALL_HEIGHT=5;
-export const SPINNERS=[20,64,112,158,196,726,812];
-export const MOVERS=[692,790];
+export const SPINNERS=SPINNER_POSITIONS;
+export const MOVERS=[692,790].map(z=>z*COURSE_SCALE);
 export const MOVER_RATE=2.1,GATE_RATE=1.4,SPINNER_RATE=3.6;
 export const moverX=(time:number,z:number)=>Math.sin(time*MOVER_RATE+z)*4;
 export const spinnerAngle=(time:number,z:number)=>time*SPINNER_RATE+z;
-export const WALLS=[{x:-4,z:12,w:6},{x:4,z:672,w:6}];
-export const GATES=[88,136,180,762];
-export const PENDULUMS=[450,544,640];
-export const BELTS=[{z:552,d:6,dir:1},{z:702,d:7,dir:-1},{z:780,d:6,dir:1}];
-export const BOUNCERS=[295,377,832];
+export const WALLS=[{x:-4,z:12,w:6},{x:4,z:672,w:6}].map(w=>({...w,z:w.z*COURSE_SCALE}));
+export const GATES=GATE_POSITIONS;
+export const PENDULUMS=[450,544,640].map(z=>z*COURSE_SCALE);
+export const BELTS=[{z:552,d:6,dir:1},{z:702,d:7,dir:-1},{z:780,d:6,dir:1}].map(b=>({...b,z:b.z*COURSE_SCALE}));
+export const BOUNCERS=[295,377,832].map(z=>z*COURSE_SCALE);
 export const gateAngle=(time:number,z:number)=>time*GATE_RATE+z;
 export function pendulum(time:number,z:number){const x=Math.sin(time*2.0+z)*5;return {x,y:1.5+Math.abs(x)*.35};}
-export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<220)return prefix+'회전 장애물은 옆으로 피하거나 기다려요';if(z<440)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<660)return prefix+'흔들리는 공을 피하고 좁은 길 가운데로!';return prefix+'움직이는 장치를 피하고 결승선까지!';}
+export function courseHint(z:number){const sector=courseSector(z),prefix=sector.name+' · ';if(z>FINISH-26)return '마지막 직선! 출발선으로 돌아오면 완주!';if(GAPS.some(([a,b])=>z>a-9&&z<b))return prefix+(RAFTS.some(([a,b])=>z>a-9&&z<b)?'보라색 발판을 기다렸다가 건너요':'노란 화살표에서 점프!');if([...SPINNERS,...GATES].some(at=>Math.abs(z-at)<14))return prefix+'가장자리는 낭떠러지! 회전벽의 빈틈을 보고 통과해요';if(NARROWS.some(n=>z>n.start-6&&z<n.end))return prefix+'가운데로! 끊긴 길은 노란 표시에서 점프';if(z<SECTOR_LENGTH)return prefix+'회전벽은 타이밍을 보고 통과해요';if(z<SECTOR_LENGTH*2)return prefix+'보라 발판은 기다리기 · 노란 화살표는 점프';if(z<SECTOR_LENGTH*3)return prefix+'흔들리는 공을 피하고 좁은 길 가운데로!';return prefix+'움직이는 장치를 피하고 결승선까지!';}
 
 export const PALETTE=['#59c7ab','#f6a37f','#9990e3','#f0c557','#71b7e3','#ea93bb','#a9cc6f','#b39ad4'];
 export type RaceInput={seq:number;x:number;z:number;jump:boolean};
@@ -76,8 +76,8 @@ export function stepRacer(r:RaceRoom,p:Racer,c:RaceInput,at:number){
   const direction=Math.sign(p.x)||Math.sign(-Math.sin(a)*(Math.sign(contact.along)||1))||1;
   p.pushVX=direction*36;p.pushVZ=0;p.jumpUntil=0;p.vy=3;p.stun=at+3000;
  };
- for(const z of GATES)rotatingContact(z,gateAngle(t,z),GATE_RATE,5.9);
- for(const z of SPINNERS)rotatingContact(z,spinnerAngle(t,z),SPINNER_RATE,6);
+ for(const z of GATES)rotatingContact(z,gateAngle(t,z),GATE_RATE,ROTATING_HALF);
+ for(const z of SPINNERS)rotatingContact(z,spinnerAngle(t,z),SPINNER_RATE,ROTATING_HALF);
  for(const z of PENDULUMS){const ball=pendulum(t,z);if(Math.hypot(p.x-ball.x,p.z-z)<1.7&&Math.abs(p.y+.9-ball.y)<2&&at>=p.stun){p.x+=(p.x>=ball.x?1:-1)*1.7;p.z-=1.2;p.vy=4;p.stun=at+650;}}
  if(BOUNCERS.some(z=>Math.abs(p.z-z)<1.4)&&Math.abs(p.x)<2.4&&p.y===0&&at>p.bounce){p.vy=12;p.bounce=at+1400;}
  if(p.y< -5){p.x=0;p.z=p.safeZ??START;p.y=0;p.vy=0;p.pushVX=0;p.pushVZ=0;p.jumpUntil=0;p.falls++;p.stun=0;p.bounce=0;p.respawnUntil=at+RESPAWN_DELAY;return;}
