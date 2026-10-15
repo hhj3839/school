@@ -10,9 +10,10 @@ const seed=()=>crypto.getRandomValues(new Uint32Array(1))[0];
 export async function POST(req:Request){try{
  if(req.headers.get('origin')&&req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'다른 사이트에서는 요청할 수 없어요.'},403);
  const raw=await req.text();if(raw.length>4096)return reply({error:'요청이 너무 커요.'},413);
- const a=JSON.parse(raw),db=database(),now=Date.now(),gate=await classroomState();
- if(!gate.open)return reply({error:'선생님이 모든 게임을 종료했어요.'},423);
+ const a=JSON.parse(raw),db=database(),now=Date.now();
+ let gate:{open:boolean;revision:number};
  if(a.action==='create'){
+  gate=await classroomState();if(!gate.open)return reply({error:'선생님이 모든 게임을 종료했어요.'},423);
   
   
   await cleanIdleRooms(now);
@@ -29,7 +30,7 @@ export async function POST(req:Request){try{
  const code=String(a.code||'').toUpperCase();if(!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드 6자리를 확인해 주세요.'},400);
  if(a.action==='input'&&(!Array.isArray(a.commands)||a.commands.length>12||a.commands.some((c:{seq:number;key:string})=>!c||!Number.isSafeInteger(c.seq)||c.seq<1||!['left','right','rotate','down','drop','item-shield','item-clean','item-attack'].includes(c.key))))return reply({error:'조작 정보를 다시 확인해 주세요.'},400);
  for(let attempt=0;attempt<12;attempt++){
-  const row=await db.prepare('SELECT state,version,expires FROM rooms WHERE code=? AND expires>?').bind(code,now).first<{state:string;version:number;expires:number}>();if(!row)return reply({error:'방이 끝났어요. 새 방에 들어가 주세요.'},404);
+  const row=await db.prepare('SELECT r.state,r.version,c.opened,c.revision FROM classroom c LEFT JOIN rooms r ON r.code=? AND r.expires>? WHERE c.id=1').bind(code,now).first<{state:string|null;version:number;opened:number;revision:number}>();if(!row)throw Error('Classroom configuration missing');if(!row.opened)return reply({error:'선생님이 모든 게임을 종료했어요.'},423);gate={open:true,revision:row.revision};if(!row.state)return reply({error:'방이 끝났어요. 새 방에 들어가 주세요.'},404);
   const r=JSON.parse(row.state);if(!isBlocks(r))return reply({error:'다른 게임의 방이에요. 게임을 다시 골라 주세요.'},409);
   const before=JSON.stringify(r);r.players=r.players.filter(p=>now-p.last<ROOM_IDLE_MS);
   if(!r.players.length){await db.prepare('DELETE FROM rooms WHERE code=? AND version=?').bind(code,row.version).run();return reply({error:'모두 나가서 방이 정리됐어요.'},404);}

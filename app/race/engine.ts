@@ -1,6 +1,7 @@
 import {sweptBlade} from './collision';
 import {COURSE_LENGTH,CHECKPOINTS,courseSector,NARROWS,trackHalfWidth,courseSpeedScale} from './course';
 export const FINISH=COURSE_LENGTH,STEP=50,DURATION=480000,CAPACITY=20;
+export const INPUT_LIMIT=24,INPUT_WINDOW=STEP*INPUT_LIMIT;
 export const SPEED=13.5;
 export const RAFTS=[[265,277],[337,349],[389,401]];
 export const RAFT=RAFTS[0];

@@ -50,8 +50,16 @@ d=await play('input',{...sessions[0],round:1,commands:[{seq:9,x:0,z:1,jump:false
 assert.equal((await manage('resumeRoom')).status,200);d=await play('state',sessions[0]);assert.equal(d.room.end,end+10000);
 const summary=await control('status');assert.equal(summary.rooms[0].kind,'race');assert.equal(summary.rooms[0].online,20);
 assert.equal((await manage('endRoom')).status,200);d=await play('start',sessions[0]);assert.equal(d.room.round,2);assert.equal(d.room.players[0].seq,0);
+
+// A delayed connection must accept more than the old 400ms/8-input window,
+// but cannot use the larger batch to move faster than server time.
+{const row=sql.prepare('SELECT state FROM rooms WHERE code=?').get(made.room.code);const delayed=JSON.parse(row.state);delayed.phase='playing';delayed.paused=0;delayed.start=clock-2000;delayed.end=clock+60000;const q=delayed.players[0];Object.assign(q,{x:0,z:36,y:0,vy:0,seq:0,at:clock-700,last:clock,out:false,finished:0,stun:0,falls:0});sql.prepare('UPDATE rooms SET state=? WHERE code=?').run(JSON.stringify(delayed),made.room.code);
+ const commands=Array.from({length:14},(_,i)=>({seq:i+1,x:0,z:0,jump:i===13}));let delayedReply=await play('input',{...sessions[0],round:delayed.round,commands});assert.equal(delayedReply.status,200);assert.equal(delayedReply.room.players[0].seq,14,'700ms input batch drains without losing commands');assert.ok(delayedReply.room.players[0].y>0,'last queued jump still happens');
+ delayedReply=await play('input',{...sessions[0],round:delayed.round,commands:[{seq:15,x:0,z:1,jump:false}]});assert.equal(delayedReply.room.players[0].seq,14,'larger batch cannot exceed server time');
+ assert.equal((await play('input',{...sessions[0],round:delayed.round,commands:Array.from({length:engine.INPUT_LIMIT+1},(_,i)=>({seq:i+1,x:0,z:0,jump:false}))})).status,400);
+}
 assert.equal((await manage('deleteRoom')).status,200);assert.equal((await play('state',sessions[1])).status,404);
-await control('close');assert.equal((await play('create',{name:'닫힘'})).status,423);await control('open');
+await control('close');assert.equal((await play('create',{name:'닫힘'})).status,423);assert.equal((await play('state',sessions[0])).status,423);await control('open');
 // Full course simulation, using the same movement and hazards as client/server.
 const r=engine.practiceRace('완주 연습',clock),p=r.players[0];let at=r.start;
 for(let i=0;i<engine.DURATION/engine.STEP&&!p.finished;i++){

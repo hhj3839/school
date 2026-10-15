@@ -2,10 +2,10 @@ import './resolve-ts.mjs';
 import assert from 'node:assert/strict';
 const {queueRaceInput,replayInputs}=await import('../app/race/motion.ts');
 const e=await import('../app/race/engine.ts');
-const queue=Array.from({length:8},(_,i)=>({seq:i+1,x:0,z:1,jump:false})),input={x:.4,z:1,jump:true};
-for(let i=0;i<20;i++){assert.equal(queueRaceInput(queue,input,9),null);assert.equal(input.jump,true,'network backlog retains a tap');}
-queue.splice(0,8);const command=queueRaceInput(queue,input,9);assert.equal(command.jump,true);assert.equal(input.jump,false);
-const next=queueRaceInput(queue,input,10);assert.equal(next.jump,false,'one tap is emitted exactly once');
+const queue=Array.from({length:e.INPUT_LIMIT},(_,i)=>({seq:i+1,x:0,z:1,jump:false})),input={x:.4,z:1,jump:true};
+for(let i=0;i<20;i++){assert.equal(queueRaceInput(queue,input,e.INPUT_LIMIT+1),null);assert.equal(input.jump,true,'network backlog retains a tap');}
+queue.splice(0,e.INPUT_LIMIT);const command=queueRaceInput(queue,input,e.INPUT_LIMIT+1);assert.equal(command.jump,true);assert.equal(input.jump,false);
+const next=queueRaceInput(queue,input,e.INPUT_LIMIT+2);assert.equal(next.jump,false,'one tap is emitted exactly once');
 const r=e.practiceRace('점프',10000),p=r.players[0];p.z=36;p.at=r.start;
 replayInputs(r,p.id,[command]);assert.ok(p.y>0&&p.vy>0,'jump while moving predicts immediately');
 const landing=e.practiceRace('착지',10000),lp=landing.players[0];lp.z=36;lp.y=.03;lp.vy=-1;
