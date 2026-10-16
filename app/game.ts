@@ -15,11 +15,11 @@ export const WALLS=[{x:270,y:110,w:26,h:225},{x:710,y:395,w:210,h:30},{x:940,y:1
 export const OBSTACLE_HEIGHTS=[2.6,1.3,2.4,.9,1.4,1.3,5.6,4.8,2.8,...CAMO_PROPS.map(p=>p.height)];
 export type MapId='art'|'amusement'|'forest'|'ocean'|'museum';
 export const MAPS=[
- {id:'art',name:'미술교실',icon:'🎨',description:'책장 · 그림 · 색칠 도구',colors:['#923f37','#dbba79','#436966']},
- {id:'amusement',name:'놀이공원',icon:'🎡',description:'대관람차 · 매점 · 선물',colors:['#ed5353','#f0bd4c','#569be0']},
- {id:'forest',name:'숲속 캠핑',icon:'⛺',description:'키 큰 나무 · 텐트 · 통나무',colors:['#68875d','#78532f','#ad8051']},
- {id:'ocean',name:'해저탐험',icon:'🐠',description:'산호 · 난파선 · 보물 상자',colors:['#2294ab','#ed7891','#dfba72']},
- {id:'museum',name:'박물관',icon:'🏛️',description:'유물 · 전시대 · 그림 전시',colors:['#d8cdb6','#ab8055','#456c79']}
+ {id:'art',name:'미술교실',icon:'',description:'책장 · 그림 · 색칠 도구',colors:['#923f37','#dbba79','#436966']},
+ {id:'amusement',name:'놀이공원',icon:'',description:'대관람차 · 매점 · 선물',colors:['#ed5353','#f0bd4c','#569be0']},
+ {id:'forest',name:'숲속 캠핑',icon:'',description:'키 큰 나무 · 텐트 · 통나무',colors:['#68875d','#78532f','#ad8051']},
+ {id:'ocean',name:'해저탐험',icon:'',description:'산호 · 난파선 · 보물 상자',colors:['#2294ab','#ed7891','#dfba72']},
+ {id:'museum',name:'박물관',icon:'',description:'유물 · 전시대 · 그림 전시',colors:['#d8cdb6','#ab8055','#456c79']}
 ] as const;
 export type MapObstacle={x:number;y:number;w:number;h:number;height:number;kind:string;color:string};
 const prop=(x:number,y:number,w:number,h:number,height:number,kind:string,color:string):MapObstacle=>({x,y,w,h,height,kind,color});
@@ -67,11 +67,11 @@ export function poseHeight(pose?:Pose){return pose==='curl'?.42:pose==='side'?.4
 export function visibleLine(a:Player,b:Player,mapId:MapId='art'){const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/3);for(let i=0;i<=steps;i++){const t=i/Math.max(steps,1),x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;const from=(a.elevation||0)+(a.role==='seeker'?1.48:poseHeight(a.pose)),to=(b.elevation||0)+poseHeight(b.pose),height=from+(to-from)*t;if(mapGround(mapId).some(r=>coverContains(r,x,y,height)))return false;if(mapCover(mapId).some(r=>coverContains(r,x,y,height)))return false;}return true;}
 export function nextPhase(r:Room,now:number){
  if(r.phase==='lobby'||r.phase==='result'){if(r.players.length<=roomSettings(r).seekerCount)return;r.playArea=areaForCount(r.players.length);r.round++;r.phase='paint';r.end=now+roomSettings(r).paintSeconds*1000;r.winner='';r.message='';r.players.forEach((p,i)=>{p.role=(i-(r.round-1)%r.players.length+r.players.length)%r.players.length<roomSettings(r).seekerCount?'seeker':'hider';p.caught=false;p.x=(380+(i%10)*65)*MAP_SCALE;p.y=(650+Math.floor(i/10)*65)*MAP_SCALE;p.angle=Math.PI;p.elevation=0;p.pose='stand';delete p.leftArm;delete p.rightArm;p.locked=false;p.moveAt=now;p.catchAt=0;p.shots=0;p.reloadUntil=0;p.viewYaw=0;p.viewPitch=.16;});}
- else if(r.phase==='paint'){r.phase='seek';r.end=now+roomSettings(r).seekSeconds*1000;r.message='숨기 시간 끝! 술래가 출발해요.';}
+ else if(r.phase==='paint'){r.phase='seek';r.end=now+roomSettings(r).seekSeconds*1000;r.message="숨기 종료 · 술래 출발";}
  else if(r.phase==='hide'){r.phase='seek';r.end=now+roomSettings(r).seekSeconds*1000;}
  else if(r.phase==='seek'){r.phase='result';r.winner=r.players.some(p=>p.role==='hider'&&!p.caught)?'숨는 친구들':'술래';r.end=0;}
 }
-export function advance(r:Room,now:number){if(r.paused)return;if(!['lobby','result'].includes(r.phase)&&!r.players.some(p=>p.role==='seeker')){r.phase='result';r.end=0;r.winner='술래가 모두 나가서 판이 끝났어요';return;}while(r.phase!=='lobby'&&r.phase!=='result'&&now>=r.end)nextPhase(r,r.end);if(r.phase==='seek'&&r.players.filter(p=>p.role==='hider').every(p=>p.caught))nextPhase(r,now);}
+export function advance(r:Room,now:number){if(r.paused)return;if(!['lobby','result'].includes(r.phase)&&!r.players.some(p=>p.role==='seeker')){r.phase='result';r.end=0;r.winner="술래 전원 퇴장 · 경기 종료";return;}while(r.phase!=='lobby'&&r.phase!=='result'&&now>=r.end)nextPhase(r,r.end);if(r.phase==='seek'&&r.players.filter(p=>p.role==='hider').every(p=>p.caught))nextPhase(r,now);}
 export function catchTarget(r:Room,p:Player,targetId:string,now:number){if(r.phase!=='seek'||r.paused||p.role!=='seeker'||p.caught||ammunition(p,now).wait>0||now-p.catchAt<SHOT_COOLDOWN)return false;if(p.reloadUntil){p.shots=0;p.reloadUntil=0;}p.shots=(p.shots||0)+1;if(p.shots>=MAGAZINE)p.reloadUntil=now+RELOAD_MS;p.catchAt=now;const target=r.players.find(q=>q.id===targetId&&q.role==='hider'&&!q.caught&&Math.hypot(q.x-p.x,q.y-p.y,((q.elevation||0)-(p.elevation||0))*100)<=SHOT_RANGE&&visibleLine(p,q,roomSettings(r).mapId));if(target){target.caught=true;r.message=target.name+' 발견!';advance(r,now);return true;}return false;}
 export function catchNearest(r:Room,p:Player,now:number){const target=r.players.filter(q=>q.role==='hider'&&!q.caught&&Math.hypot(q.x-p.x,q.y-p.y)<=85&&visibleLine(p,q,roomSettings(r).mapId)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];return target?catchTarget(r,p,target.id,now):false;}
 const hiddenPaint=defaultPaint();

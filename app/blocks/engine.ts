@@ -18,7 +18,7 @@ export function makeBlockRoom(code:string,p:BlockPlayer,attack=true):BlockRoom{r
 export function fallSpeed(p:BlockPlayer){return Math.max(280,850-Math.floor(p.lines/8)*75);}
 export function startBlocks(r:BlockRoom,now:number,seed:number){r.round++;r.phase='playing';r.start=now+3000;r.end=r.start+DURATION;r.paused=0;r.winner='';r.players=r.players.map(p=>({...makeBlockPlayer(p.id,p.name,r.start,seed),token:p.token,last:now}));}
 export function rankings(r:BlockRoom){return [...r.players].sort((a,b)=>Number(a.out)-Number(b.out)||b.score-a.score||b.lines-a.lines||b.outAt-a.outAt);}
-export function finishBlocks(r:BlockRoom,label?:string){r.phase='result';r.paused=0;const order=rankings(r),first=order[0],ties=order.filter(p=>first&&p.out===first.out&&p.score===first.score&&p.lines===first.lines&&(!p.out||p.outAt===first.outAt));r.winner=label||(r.practice?'연습을 마쳤어요':ties.length>1?'공동 우승!':first?first.name+' 승리!':'이번 판이 끝났어요');}
+export function finishBlocks(r:BlockRoom,label?:string){r.phase='result';r.paused=0;const order=rankings(r),first=order[0],ties=order.filter(p=>first&&p.out===first.out&&p.score===first.score&&p.lines===first.lines&&(!p.out||p.outAt===first.outAt));r.winner=label||(r.practice?"연습 완료":ties.length>1?'공동 우승!':first?first.name+' 승리!':"경기 종료");}
 export function itemMode(r:BlockRoom){return !r.attack&&!r.practice;}
 function sendAttack(r:BlockRoom,p:BlockPlayer,amount:number,now:number){
  const others=r.players.filter(q=>q.id!==p.id&&!q.out);if(!others.length)return false;

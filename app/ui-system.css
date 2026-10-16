@@ -1,0 +1,35 @@
+/* Shared interface rules. Canvas pixels, map geometry and paint colors stay intact. */
+:root{--ui-bg:#f5f6f7;--ui-paper:#fff;--ui-text:#202b2d;--ui-muted:#637174;--ui-line:#dce2e3;--ui-accent:#16776b;--ui-soft:#e8f3f0;font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--ui-text);background:var(--ui-bg);font-variant-numeric:tabular-nums}
+html,body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important;color:var(--ui-text);background:var(--ui-bg)}
+*,*::before,*::after{word-break:keep-all;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font-family:inherit}
+button,[role=button],[role=tab],summary,nav a{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+button,[role=button],[role=tab],nav a{white-space:nowrap}
+button,a,input,select,textarea,summary{outline:none!important}
+:is(button,a,input,select,textarea,summary):focus-visible{outline:none!important;box-shadow:0 0 0 3px #16776b55!important}
+input,textarea{-webkit-user-select:text;user-select:text}
+:is(.arcade-shell,.welcome,.blocks-page,.race-page,.game-layout,.topbar,body>footer){background:var(--ui-bg)!important;background-image:none!important;color:var(--ui-text)!important}
+:is(.arcade-entry,.welcome-card,.blocks-card,.blocks-lobby,.race-entry,.race-lobby,.teacher-panel,.teacher-room,.workbench,.panel-tabs,.panel-content,.session-panel,.players,.spectator-panel,.practice-guide,.quick-guide,.camouflage-preview,.blocks-practice-help){background:var(--ui-paper)!important;background-image:none!important;border:1px solid var(--ui-line)!important;border-radius:16px!important;box-shadow:none!important;color:var(--ui-text)!important}
+.arcade-shell::before,.arcade-shell::after,.arcade-entry::before,.welcome-card::before,.blocks-card::before,.race-entry::before,.race-lobby::before,.arcade-game::after{content:none!important;display:none!important}
+:is(.arcade-game,.map-card,.entry-choice,.race-seats article,.blocks-seats article,.lobby-players li){background:var(--ui-paper)!important;background-image:none!important;border:1px solid var(--ui-line)!important;border-radius:16px!important;box-shadow:none!important;color:var(--ui-text)!important}
+:is(.arcade-game,.map-card,.entry-choice):hover{background:#f0f5f3!important;border-color:var(--ui-accent)!important}
+body :is(.arcade-brand,.welcome-brand,.brand,.blocks-top,.race-header,.panel-title,h1,h2,h3){color:var(--ui-text)!important}
+:is(.arcade-shell,.welcome,.blocks-page,.race-page,.teacher-panel,.workbench,.spectator-panel,.quick-guide,.practice-guide) :is(p,small,label,.description,.field-label,.arcade-game-text>span){color:var(--ui-muted)!important}
+:is(.arcade-game-text,.race-seats,.blocks-seats,.lobby-players) strong{color:var(--ui-text)!important}
+body button:not([style*="background"]){background:#edf0f1!important;background-image:none!important;border:1px solid var(--ui-line)!important;border-radius:10px!important;box-shadow:none!important;color:var(--ui-text)!important;font-weight:600}
+body button:not([style*="background"]):hover:not(:disabled){background:#e3e9e8!important}
+body :is(button.primary,button.arcade-enter,button.blocks-primary,button.race-primary,button[aria-pressed=true],button.selected,button.active){background:var(--ui-accent)!important;border-color:var(--ui-accent)!important;color:#fff!important}
+body :is(button.primary,button.arcade-enter,button.blocks-primary,button.race-primary):hover:not(:disabled){background:#116357!important}
+body :is(.map-card.selected,.my-seat,.featured-room){border:2px solid var(--ui-accent)!important;background:var(--ui-soft)!important;box-shadow:none!important}
+body :is(.arcade-step,.race-badge,.blocks-eyebrow,.welcome-kicker,.blocks-board-label,.scene-label,.race-rank,.race-timer,.race-sector,.race-leaders,.race-tip,.kid-guide){background:var(--ui-paper)!important;color:var(--ui-text)!important;border:1px solid var(--ui-line)!important;border-radius:10px!important;box-shadow:none!important;text-shadow:none!important;letter-spacing:normal}
+body :is(.waiting-note,.pregame-rules,.welcome-join,.rule-recommendation,.simple-recommendation,.blocks-rules,.connection-warning,.teacher-delete-confirm,.blocks-incoming){background:#f0f3f3!important;color:var(--ui-text)!important;border:1px solid var(--ui-line)!important;border-radius:12px!important;box-shadow:none!important}
+body :is(.arcade-game-icon,.blocks-symbol,.race-emblem){background:var(--ui-soft)!important;color:var(--ui-accent)!important;border:0!important;box-shadow:none!important;transform:none}
+body input:not([type=range]):not([type=color]),body select,body textarea{background:#fff!important;color:var(--ui-text)!important;border:1px solid #b9c5c4!important;border-radius:10px!important}
+body :is(.toast,.toast.error,.shot-result,.shot-result.hit){background:var(--ui-text)!important;color:#fff!important;border:0!important;border-radius:10px!important;box-shadow:none!important}
+body :is(.connection-shield,.veil,.blocks-overlay){background:#fffffff2!important;color:var(--ui-text)!important;text-shadow:none!important}
+body :is(.connection-shield,.veil,.blocks-overlay) :is(p,strong,small){color:var(--ui-text)!important}
+body :is(.teacher-stop,.teacher-delete){background:#edf0f1!important;color:var(--ui-text)!important;border:1px solid #879596!important}
+.arcade-game-text strong{letter-spacing:-.5px}.arcade-brand{letter-spacing:-.5px}.blocks-item-key>span{display:flex;align-items:center;justify-content:center;gap:6px}.blocks-item-key svg{width:20px;height:20px}
+body :is(.entry-choice,.welcome-card,.race-entry,.blocks-card) strong{color:var(--ui-text)!important}
+body :is(.arcade-brand,.welcome-brand,.brand) svg{color:var(--ui-accent)!important}
+@media(prefers-reduced-motion:reduce){button,a{transition:none!important}}

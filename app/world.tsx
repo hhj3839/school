@@ -31,7 +31,7 @@ function mannequin(p:Player){const group=new THREE.Group(),tex=paintTexture(p.pa
 function setPose(model:ReturnType<typeof mannequin>,pose:Pose,leftArm?:number,rightArm?:number){const key=pose+':'+leftArm+':'+rightArm;if(model.poseKey===key)return;model.poseKey=key;model.pose=pose;applyPoseRig(model.group,model.meshes,pose,leftArm,rightArm);}
 export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),current=useRef(props),[failed,setFailed]=useState(false);current.current=props;
  useEffect(()=>{if(!host.current)return;const container=host.current;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:!props.lightMode,alpha:false});}catch{setFailed(true);return;}
- renderer.setPixelRatio(props.lightMode?1:Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=!props.lightMode;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label','3D 숨바꼭질 맵: 드래그로 둘러보고 캐릭터에 직접 색칠하세요');renderer.domElement.tabIndex=0;
+ renderer.setPixelRatio(props.lightMode?1:Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=!props.lightMode;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label',"3D 숨바꼭질 · 드래그 시점 이동 · 캐릭터 색칠");renderer.domElement.tabIndex=0;
  const scene=new THREE.Scene();scene.background=new THREE.Color('#bcc6be');scene.fog=new THREE.Fog('#bcc6be',32,65);const camera=new THREE.PerspectiveCamera(58,1,.04,90);scene.add(new THREE.HemisphereLight('#ffefd4','#83908c',2));const sun=new THREE.DirectionalLight('#ffdfb2',2.4);sun.position.set(4,9,6);sun.castShadow=!props.lightMode;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-10;scene.add(sun);
  const blockers:THREE.Mesh[]=[],surfaces:THREE.Mesh[]=[],textures:THREE.Texture[]=[];
  function material(type:'brick'|'wood'|'leaf'|'floor'|'blue',rx=1,ry=1){const t=textureCanvas(type);t.repeat.set(rx,ry);textures.push(t);return new THREE.MeshStandardMaterial({map:t,roughness:1,metalness:0});}
@@ -142,7 +142,7 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  blaster.visible=first&&!c.reveal&&!r?.paused;const firing=time-shotAt<130;muzzle.visible=firing;beam.visible=firing&&blaster.visible;blaster.position.z=-.43+(firing?.045:0);renderer.render(scene,camera);frame=requestAnimationFrame(render);}
  frame=requestAnimationFrame(render);return()=>{cancelAnimationFrame(frame);resize.disconnect();props.api.current=null;models.forEach(m=>{m.mat.dispose();m.texture.dispose();m.label.material.dispose();m.labelTexture.dispose();});scene.traverse(o=>{if(o instanceof THREE.Sprite)o.material.dispose();if(o instanceof THREE.Mesh){o.geometry.dispose();if(!Array.isArray(o.material))o.material.dispose();}});beam.geometry.dispose();beam.material.dispose();textures.forEach(t=>t.dispose());renderer.dispose();canvas.remove();};
  },[]);
- return <div className={"world-canvas "+(props.picking?'picking':props.mode==='paint'?'painting':'')} ref={host}>{failed&&<div className="graphics-error">이 브라우저에서 3D 화면을 열 수 없어요. WebGL을 지원하는 최신 브라우저로 열어 주세요.</div>}</div>;
+ return <div className={"world-canvas "+(props.picking?'picking':props.mode==='paint'?'painting':'')} ref={host}>{failed&&<div className="graphics-error">3D 표시 불가 · WebGL 지원 브라우저 필요</div>}</div>;
 }
 
 
