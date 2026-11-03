@@ -14,7 +14,9 @@ export class FrameBudget {
   const fps=this.frames*1000/elapsed,cpuMs=this.work/this.frames,stalls=this.stalls;
   let nextRatio=ratio;
   if(stalls===0&&now-this.lastChange>=3000){
-   if(fps<24&&cpuMs>20)nextRatio=Math.max(.4,ratio-.1);
+   // GPU work can be asynchronous: a short CPU frame alone does not prove
+   // the GPU is keeping up. Adapt to sustained slow frames without stalls.
+   if(fps<24)nextRatio=Math.max(.4,ratio-.1);
    else if(fps>=28&&cpuMs<12)nextRatio=Math.min(ceiling,ratio+.1);
    if(nextRatio!==ratio)this.lastChange=now;
   }
