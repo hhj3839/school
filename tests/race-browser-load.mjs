@@ -5,7 +5,7 @@ import {writeFile} from 'node:fs/promises';
 const [base,code,seconds='120']=process.argv.slice(2);
 assert.ok(['http://127.0.0.1:5173','https://kkokkkok-school.vercel.app'].includes(base));
 assert.match(code||'',/^[A-Z2-9]{6}$/);
-const duration=Number(seconds);assert.ok(duration>=30&&duration<=180);
+const duration=Number(seconds);assert.ok(duration>=30&&duration<=360);
 const sessions=[],latencies=[],statuses={};let inputs=0,errors=0;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function call(action,session={},extra={}){
