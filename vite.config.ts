@@ -70,8 +70,6 @@ export default defineConfig(async ({ command }) => {
                 groups: [{
                   name: "three-shaders",
                   test: /[\\/]node_modules[\\/]three[\\/]src[\\/]renderers[\\/]shaders[\\/]/,
-                  // Keep shader dependencies in their normal shared chunks.
-                  includeDependenciesRecursively: false,
                 }],
               },
             },
