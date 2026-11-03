@@ -15,7 +15,7 @@ async function call(handler,path,body,key,origin='http://localhost'){const respo
 const control=(action,key='test-only-secret',origin)=>call(classroom.POST,'classroom',{action},key,origin);
 const play=(action,data={})=>call(room.POST,'room',{action,...data});
 
-const {ammunition,finalHint,spectatorPlayers,makeRoom,makePlayer}=await import('../app/game.ts');
+const {ammunition,finalHint,spectatorPlayers}=await import('../app/game.ts');
 sql.exec('UPDATE classroom SET student_create=0');
 const teacher=await play('create',{name:'학생 방장'});assert.equal(teacher.status,200);
 const session={code:teacher.room.code,token:teacher.token};

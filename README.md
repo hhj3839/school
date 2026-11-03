@@ -121,3 +121,57 @@ TypeScript 검사 및 Worker 빌드 통과. 6명의 동시 입장, 색칠/자세
 ### 미술실 확장
 가로·세로 12×7.6m에서 18×11.4m로, 벽 높이 3.3m에서 6.6m로 확장하고 천장을 추가했습니다. 상승 한도는 4.6m입니다. 높은 벽 책장 2곳, 높은 액자, 확장 구역 장애물 3곳을 추가했습니다. 연습은 중앙에서 시작하고 순찰 경로도 확장했습니다. 높은 곳의 발견 시야는 장애물 높이를 고려합니다. 이동 충돌은 기존처럼 장애물의 바닥 영역을 막으므로 선반 위에 올라서거나 장애물 위를 가로질러 통과하는 물리는 아직 지원하지 않습니다.
 검증: 확장 경계·새 장애물 충돌·상승 상한·높이에 따른 시야 테스트, TypeScript 및 빌드 통과. 브라우저에서 높은 책장과 천장 렌더링 확인. 실제 태블릿 성능 검증은 필요합니다.
+
+## 터치 입력 안정화 (2026-10-05)
+
+- 블록 대결: 먼저 누른 손가락만 해당 버튼의 반복 입력을 제어합니다. 다른 손가락의 해제·취소로 기존 입력이 끊기지 않으며, 포커스를 잃으면 반복 입력을 중단합니다.
+- 레이스: 창 전환·화면 숨김·페이지 이탈 시 이동 패드의 활성 터치와 이동량을 초기화합니다. 이전 터치의 뒤늦은 이벤트가 새 터치를 취소하지 않습니다.
+- 숨바꼭질: 그림판의 붓질·시점 드래그를 화면 전환 시 종료하고, 이동·높이 조절에도 페이지 이탈 처리를 적용합니다.
+- 공통 입력 처리: app/pointer-gesture.ts. 회귀 테스트: node --test tests/pointer-gesture.mjs (6개 통과).
+- 검증: TypeScript 검사, 프로덕션 빌드, 기존 game-rules / blocks / blocks-practice / race / race-motion / race-rotation / race-wall-push / practice-guide 테스트 통과.
+- 브라우저 1024×768에서 블록 이동·회전·내리기, 레이스 이동·점프, 숨바꼭질 이동·높이·직접 색칠 확인. 실제 태블릿 다중 터치와 학교 네트워크는 별도 확인 필요. 이번 변경은 로컬 소스에만 적용했으며 GitHub push와 배포는 수행하지 않았습니다.
+
+## 수업 전 동시 접속 시범 (2026-10-06)
+
+실제 https://kkokkkok-school.vercel.app 에서 가상 HTTP 참가자 20명으로 각 시나리오를 45초씩 실행했습니다.
+- 20-player hideout: 969 requests, p95 867 ms, statuses {"200":969}, pause/resume passed.
+- 20-player race: 932 requests, p95 760 ms, statuses {"200":931,"503":1}, pause/resume passed.
+- 20-player blocks, five rooms: 976 requests, p95 1003 ms, statuses {"200":972,"429":4}, pause/resume passed.
+- 20-player mixed games: 980 requests, p95 871 ms, statuses {"200":978,"429":2}, pause/resume passed.
+
+각 시나리오에서 4명은 1.8초 동안 요청을 중단했다가 같은 참가자로 복귀했습니다. 429는 방 생성 5초 제한에 따라 기다린 뒤 재시도한 응답이며, 레이스의 일시적인 503 한 건도 재시도로 복구했습니다. 실제 학교 Wi-Fi, 실제 태블릿 20대의 3D 프레임 속도, 전체 수업 시간 동안의 장기 안정성은 이 시험으로 검증하지 않았습니다. 태블릿 1024×768 및 PC 1366×768 브라우저 크기에서 실제 사이트의 블록 이동·회전·내리기를 확인했습니다.
+
+로컬 production Worker 시작 시 전체 Three.js import의 DefaultLoadingManager 초기화가 /api/room을 실패시키는 문제도 발견해 서버 판정용 import와 공유 geometry를 분리했습니다. server-startup, server-vision, game-rules, race, blocks 테스트, TypeScript 및 production 빌드가 통과했습니다. 이 소스 변경과 앞선 터치 개선은 아직 push/deploy하지 않았습니다. 실제 사이트 부하 시험은 현재 배포본 기준입니다.
+
+결과 파일: outputs/live-classroom-rehearsal.json. 재현: REHEARSAL_URL=https://kkokkkok-school.vercel.app node tests/classroom-rehearsal.mjs (기존 사용자 방을 변경하지 않고 시험 방만 생성·정리합니다).
+
+## 린트 및 프로덕션 재검증 (2026-11-03)
+
+- 렌더링 중 ref 갱신을 layout effect로 이동하고, 화면에 표시하는 서버 시간 보정과 대기 입력 수를 React 상태로 분리했습니다. 시계 초기화도 렌더링 중 현재 시간을 직접 읽지 않습니다.
+- 브라우저 설정·초대 코드·저장 세션을 초기 상태에서 읽습니다. `app/browser-storage.ts`는 서버 환경, 저장소 접근 거절, 손상된 JSON과 잘못된 세션을 처리합니다. 이 화면들은 ClassroomGate의 브라우저 상태 확인 후 마운트됩니다.
+- 단계별 화면 전환은 조건부 상태 갱신으로, 숨바꼭질 안내 진행은 연습 시뮬레이션에서 처리합니다. 일반 블록 아이템 함수는 React Hook으로 오인하지 않도록 이름을 변경했습니다.
+- 게임 선택 링크는 `app/game-home-link.tsx`에서 전체 페이지 이동을 유지합니다. 실제 Worker 브라우저 검증에서 `next/link`의 RSC 이동이 실패해 확인한 호환성 예외입니다. WebGL 생성 실패를 화면에 알리는 두 catch 구문도 해당 줄에만 이유를 적어 린트 예외를 적용했습니다. 전역 규칙은 완화하지 않았습니다.
+- `npm run lint`: 오류 0개, 경고 45개. TypeScript `--noEmit --incremental false` 통과. `npm run build` 통과(500 kB 초과 청크 경고는 남음).
+- 저장소·터치·서버 초기화·시야·게임 규칙·블록·레이스·교사 제어·연습 안내 회귀 검사 26개 통과. 블록 연습 테스트의 이전 문구 기대값을 현재 UI 규칙의 `연습 완료`로 갱신했습니다.
+- 빌드된 로컬 Worker(`npm start -- --port 5173`)에서 `node --import ./tests/resolve-ts.mjs tests/maps.mjs` 통과: 5개 맵 생성/참가/시작, 게스트 설정 변경 거절, 경기 중 맵 변경 거절, 정적 맵 경계/충돌/접근성 검사.
+- Chrome에서 블록 이동·회전·놓기와 점수, 레이스 이동·점프, 숨바꼭질 이동·높이·직접 색칠·숨기와 안내 완료, 게임 선택 복귀, 새로고침 후 동일 블록 방/참가자 복귀를 확인했습니다.
+- 로컬 검증 기록: `outputs/lint-verification.txt`, `outputs/build-verification.txt`, `outputs/regression-verification.txt`, `outputs/lint-ui-verification.png`. 커밋·push·배포는 수행하지 않았습니다.
+
+### 남은 린트 경고 정리 (2026-11-03)
+
+- 미사용 import·변수·포인터 값을 제거했습니다. 공개 플레이어 및 레이스 완주 기록의 토큰은 복사본에서 제거하며 원본 인증 정보는 유지합니다.
+- 블록 입력, 레이스 상태 수신, 교사 조회 콜백을 안정화하고 effect 의존성을 보완했습니다. 숨바꼭질 그림 저장은 방 전체 대신 세션 ID·방 코드·라운드를 추적하며, 온라인 폴링과 연습 타이머는 방 존재 여부를 기준으로 유지합니다. 키보드 발사는 최신 committed handler를 사용합니다.
+- 3D 장면은 부모의 맵·영역·그래픽 모드 key에 맞춰 초기화하고, 매 프레임 최신 상태를 읽습니다. 추천 블록 방 이동은 전체 페이지 이동을 유지하는 실제 링크로 변경했습니다.
+- `eslint . --ignore-pattern dist --ignore-pattern .next --max-warnings 0`: 오류 0개, 경고 0개. TypeScript 검사와 프로덕션 빌드 통과. 기존 번들 크기 및 Vinext 경로 분류 안내는 린트와 별개로 남아 있습니다.
+- 로컬 프로덕션 서버를 포함한 회귀 검사 30개 통과. 5개 맵 API 검사 통과. Chrome에서 레이스 방 생성·동일 참가자 재접속·이동·점프, 숨바꼭질 이동·높이·직접 붓질·숨기 및 안내 완료를 확인했고 브라우저 콘솔 오류는 없었습니다.
+- 결과: `outputs/lint-warnings-final.json`, `outputs/build-zero-warnings.txt`, `outputs/regression-zero-warnings.txt`, `outputs/maps-zero-warnings.txt`, `outputs/zero-warnings-ui.png`. 커밋·push·배포는 수행하지 않았습니다.
+
+### 번들 크기 경고 해소 (2026-11-03)
+
+- `vite.config.ts`에서 Three.js 진입점을 소스 모듈로 통일해 공유 geometry와의 중복 코드를 줄이고, 클라이언트 셰이더 데이터를 별도 공유 청크로 분리했습니다. 게임 규칙·입력 처리·로딩 흐름과 500 kB 경고 기준은 변경하지 않았습니다.
+- 최대 JS 파일: 510,890 → 299,149 bytes. 전체 JS: 1,180,723 → 1,117,535 bytes. 파일별 gzip 합계: 338,380 → 326,002 bytes.
+- `tests/bundle-budget.mjs`는 빌드된 JS의 500 kB 상한, import 대상 파일 존재, 두 3D 게임의 셰이더 공유, 홈·블록 초기 의존성에서 셰이더 제외를 검사합니다. 재현: `npm run build` 후 `node tests/bundle-budget.mjs`.
+- 최종 strict lint 오류 0개·경고 0개, TypeScript 검사, 회귀 테스트 31개, 5개 맵 API 검증, 프로덕션 빌드 통과. 번들 크기 경고는 사라졌고 기존 Vinext 경로 분류 안내만 남습니다.
+- 빌드된 로컬 Worker를 Chrome에서 실행해 숨바꼭질 3D 렌더링·이동·높이·직접 색칠·숨기, 운동회 3D 렌더링·이동·점프, 블록 이동·회전·놓기·점수 반영을 확인했습니다. 세 게임의 조작 안내 완료 및 브라우저 콘솔 오류 없음 확인. 실제 태블릿 성능과 학교 네트워크는 이번 검증 범위에 포함하지 않았습니다.
+- 기록: `outputs/bundle-before.json`, `outputs/bundle-after.json`, `outputs/build-bundle-split.txt`, `outputs/regression-bundle-split.txt`, `outputs/maps-bundle-split.txt`, `outputs/bundle-hideout.png`, `outputs/bundle-race.png`. 커밋·push·배포는 수행하지 않았습니다.
+- 분할 옵션 참고: [Rolldown codeSplitting](https://rolldown.rs/reference/OutputOptions.codeSplitting).

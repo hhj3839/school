@@ -1,5 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
@@ -52,6 +53,32 @@ export default defineConfig(async ({ command }) => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    resolve: {
+      // Share the same Three classes with the geometry modules imported by
+      // three-server.ts; mixing the prebuilt entry and src duplicates the core.
+      alias: [{
+        find: /^three$/,
+        replacement: fileURLToPath(new URL("./node_modules/three/src/Three.js", import.meta.url)),
+      }],
+    },
+    environments: {
+      client: {
+        build: {
+          rolldownOptions: {
+            output: {
+              codeSplitting: {
+                groups: [{
+                  name: "three-shaders",
+                  test: /[\\/]node_modules[\\/]three[\\/]src[\\/]renderers[\\/]shaders[\\/]/,
+                  // Keep shader dependencies in their normal shared chunks.
+                  includeDependenciesRecursively: false,
+                }],
+              },
+            },
+          },
+        },
+      },
+    },
     server: {
       ...(managedLinux
         ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }

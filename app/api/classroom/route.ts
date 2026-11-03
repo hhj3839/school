@@ -9,14 +9,14 @@ import {advance,mapName,roomSettings,type Room} from '../../game';
 import { classroomState } from '../../classroom';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
-export async function GET(){try{const gate=await classroomState();const row=gate.open?await database().prepare('SELECT state FROM rooms WHERE code=(SELECT featured_code FROM classroom WHERE id=1) AND expires>?').bind(Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(r))advanceRace(r,Date.now());else if(isBlocks(r))advanceBlocks(r,Date.now());else advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,kind:isRace(r)?'race':isBlocks(r)?'blocks':'hideout',mapName:isRace(r)?'우당탕 운동회':isBlocks(r)?'블록 대결':mapName(roomSettings(r).mapId),count,capacity:isRace(r)?CAPACITY:isBlocks(r)?4:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<(isRace(r)?CAPACITY:isBlocks(r)?4:roomSettings(r).maxPlayers)};}return reply({...gate,featured});}catch{return reply({error:'연결을 확인하고 있어요.'},503);}}
+export async function GET(){try{const gate=await classroomState();const row=gate.open&&gate.featuredCode?await database().prepare('SELECT state FROM rooms WHERE code=? AND expires>?').bind(gate.featuredCode,Date.now()).first<{state:string}>():null;let featured=null;if(row){const r=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(r))advanceRace(r,Date.now());else if(isBlocks(r))advanceBlocks(r,Date.now());else advance(r,Date.now());const count=r.players.filter(p=>Date.now()-p.last<120000).length;if(count)featured={code:r.code,kind:isRace(r)?'race':isBlocks(r)?'blocks':'hideout',mapName:isRace(r)?'우당탕 운동회':isBlocks(r)?'블록 대결':mapName(roomSettings(r).mapId),count,capacity:isRace(r)?CAPACITY:isBlocks(r)?4:roomSettings(r).maxPlayers,canJoin:['lobby','result'].includes(r.phase)&&count<(isRace(r)?CAPACITY:isBlocks(r)?4:roomSettings(r).maxPlayers)};}return reply({...gate,featured});}catch{return reply({error:"연결 확인 중"},503);}}
 export async function POST(req:Request){try{
-  if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'허용되지 않은 요청이에요.'},403);
-  if(!await authorizedTeacher(req))return reply({error:'선생님 비밀번호를 확인해 주세요.'},401);
-  const raw=await req.text();if(raw.length>100)return reply({error:'잘못된 요청이에요.'},400);
+  if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:"요청 권한 없음"},403);
+  if(!await authorizedTeacher(req))return reply({error:"선생님 비밀번호 확인 필요"},401);
+  const raw=await req.text();if(raw.length>100)return reply({error:"잘못된 요청"},400);
   const {action,code}=JSON.parse(raw);
   if(action==='deleteRoom'){
-    if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
+    if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:"방 코드 확인 필요"},400);
     const [deleted]=await database().batch([
       database().prepare('DELETE FROM rooms WHERE code=?').bind(code),
       database().prepare('UPDATE classroom SET featured_code=NULL WHERE id=1 AND featured_code=?').bind(code)
@@ -30,30 +30,30 @@ export async function POST(req:Request){try{
     const featured=await db.prepare('SELECT featured_code FROM classroom WHERE id=1').first<{featured_code:string|null}>();return reply({featuredCode:featured?.featured_code,rooms,updatedAt:now,limits:{maxRooms:MAX_ROOMS,idleSeconds:ROOM_IDLE_MS/1000},totals:{rooms:rooms.length,playing:rooms.filter(r=>!['lobby','result'].includes(r.phase)).length,online:rooms.reduce((n,r)=>n+r.online,0)}});
   }
   if(action==='featureRoom'||action==='unfeatureRoom'){
-    const db=database();if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
+    const db=database();if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:"방 코드 확인 필요"},400);
     const result=action==='featureRoom'?await db.prepare('UPDATE classroom SET featured_code=? WHERE id=1 AND opened=1 AND EXISTS (SELECT 1 FROM rooms WHERE code=? AND expires>?)').bind(code,code,Date.now()).run():await db.prepare('UPDATE classroom SET featured_code=NULL WHERE id=1 AND featured_code=?').bind(code).run();
-    return result.meta.changes?reply({ok:true}):reply({error:'방이 종료되었거나 변경됐어요. 목록을 확인해 주세요.'},409);
+    return result.meta.changes?reply({ok:true}):reply({error:"방 종료·변경 · 목록 확인 필요"},409);
   }
   if(['pauseRoom','resumeRoom','endRoom'].includes(action)){
-    if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:'방 코드를 확인해 주세요.'},400);
-    const db=database(),now=Date.now(),gate=await classroomState();if(!gate.open)return reply({error:'모든 게임이 종료되어 있어요.'},409);
+    if(typeof code!=='string'||!/^[A-Z2-9]{6}$/.test(code))return reply({error:"방 코드 확인 필요"},400);
+    const db=database(),now=Date.now(),gate=await classroomState();if(!gate.open)return reply({error:"전체 게임 종료 상태"},409);
     for(let i=0;i<8;i++){
       const row=await db.prepare('SELECT state,version FROM rooms WHERE code=? AND expires>?').bind(code,now).first<{state:string;version:number}>();
-      if(!row)return reply({error:'종료되었거나 없는 방이에요.'},404);
+      if(!row)return reply({error:"종료되었거나 없는 방"},404);
       const room=JSON.parse(row.state) as Room|BlockRoom|RaceRoom;if(isRace(room))advanceRace(room,now);else if(isBlocks(room))advanceBlocks(room,now);else advance(room,now);
-      if(['lobby','result'].includes(room.phase))return reply({error:'진행 중인 판에서 사용할 수 있어요.'},409);
-      if(isRace(room)){if(action==='endRoom')finishRace(room,'선생님이 이번 판을 마쳤어요');else pauseRace(room,now,action==='pauseRoom');}
-      else if(isBlocks(room)){if(action==='endRoom')finishBlocks(room,'선생님이 이번 판을 마쳤어요');else pauseBlocks(room,now,action==='pauseRoom');}
-      else if(action==='endRoom'){room.phase='result';room.end=0;room.paused=0;room.winner='선생님이 이번 판을 마쳤어요';}
+      if(['lobby','result'].includes(room.phase))return reply({error:"경기 중 사용 가능"},409);
+      if(isRace(room)){if(action==='endRoom')finishRace(room,"선생님 경기 종료");else pauseRace(room,now,action==='pauseRoom');}
+      else if(isBlocks(room)){if(action==='endRoom')finishBlocks(room,"선생님 경기 종료");else pauseBlocks(room,now,action==='pauseRoom');}
+      else if(action==='endRoom'){room.phase='result';room.end=0;room.paused=0;room.winner="선생님 경기 종료";}
       else if(action==='pauseRoom'&&!room.paused)room.paused=now;
       else if(action==='resumeRoom'&&room.paused){room.end+=now-room.paused;room.players.forEach(p=>{p.moveAt=now;if(p.reloadUntil)p.reloadUntil+=now-room.paused;});room.paused=0;}
       if(['pauseRoom','endRoom'].includes(action)){const controlled=await writeControl(JSON.parse(row.state),room,code,now,gate.revision);if(controlled)return reply({room:teacherRoomSummary(room,now)});if(controlled===false)continue;}
       const saved=await db.prepare('UPDATE rooms SET state=?,version=version+1 WHERE code=? AND version=? AND expires>? AND EXISTS (SELECT 1 FROM classroom WHERE id=1 AND opened=1 AND revision=?)').bind(JSON.stringify(room),code,row.version,now,gate.revision).run();
       if(saved.meta.changes)return reply({room:teacherRoomSummary(room,now)});
     }
-    return reply({error:'방이 갱신 중이에요. 다시 눌러 주세요.'},409);
+    return reply({error:"방 갱신 중 · 재시도 필요"},409);
   }
-  if(action!=='open'&&action!=='close')return reply({error:'잘못된 요청이에요.'},400);
+  if(action!=='open'&&action!=='close')return reply({error:"잘못된 요청"},400);
   const db=database();
   // The switch and room invalidation commit together. Reopening never revives old rooms.
   await db.batch([
@@ -61,4 +61,4 @@ export async function POST(req:Request){try{
     db.prepare('UPDATE rooms SET expires=0'),
   ]);
   return reply(await classroomState());
-}catch{return reply({error:'변경하지 못했어요. 다시 확인해 주세요.'},503);}}
+}catch{return reply({error:"변경 실패 · 재확인 필요"},503);}}

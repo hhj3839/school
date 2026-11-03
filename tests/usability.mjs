@@ -1,7 +1,7 @@
 import './resolve-ts.mjs';
 import assert from 'node:assert/strict';
 const {coverContains,coverOverlaps}=await import('../app/cover-layout.ts');
-const {stepHeight,makePlayer,makeRoom,DEFAULT_SETTINGS,mapCover,visibleLine}=await import('../app/game.ts');
+const {stepHeight,makePlayer,makeRoom,DEFAULT_SETTINGS,mapCover}=await import('../app/game.ts');
 const planet=mapCover('museum').find(o=>o.kind==='planet'),ring=mapCover('museum').find(o=>o.kind==='ring');
 assert.ok(coverContains(planet,planet.x+planet.w/2,planet.y+planet.h/2,planet.base+planet.height/2));
 assert.equal(coverContains(planet,planet.x+1,planet.y+1,planet.base+.01),false,'empty sphere corners remain clear');

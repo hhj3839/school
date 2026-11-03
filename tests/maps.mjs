@@ -15,7 +15,7 @@ assert.notDeepEqual(mapObstacles('amusement'),mapObstacles('forest'));
 console.log('PASS: map validation, legacy fallback, 20 clear spawn points per map, unique layouts, collision and sight lines');
 
 assert.equal(MAPS.length,5);
-assert.ok(Math.abs(W*H/(1800*1140)-3)<1e-10,'floor area is exactly tripled');
+assert.ok(Math.abs(W*H/(1800*1140)-4.5)<1e-10,'floor area is 1.5 times the previous 3x map');
 assert.equal(CEILING_HEIGHT,6.6*2);assert.equal(MAX_ELEVATION,4.6*2);
 assert.equal(parseSettings({...DEFAULT_SETTINGS,mapId:'toys'}).mapId,'amusement','legacy toy rooms migrate');
 const flyer=makePlayer('fly','fly',0);for(let i=0;i<100;i++)moveHeight(flyer,1,.3);assert.equal(flyer.elevation,MAX_ELEVATION);

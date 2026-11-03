@@ -1,9 +1,11 @@
 export const COLS=10,ROWS=20,DURATION=180000;
 export const COLORS=['#f5f9fb','#59bfd4','#8795df','#efab6b','#edc86a','#76bc93','#b497d7','#eb91a5','#8f9eab'];
 export const SHAPES=[[[0,1],[1,1],[2,1],[3,1]],[[0,0],[0,1],[1,1],[2,1]],[[2,0],[0,1],[1,1],[2,1]],[[1,0],[2,0],[1,1],[2,1]],[[1,0],[2,0],[0,1],[1,1]],[[1,0],[0,1],[1,1],[2,1]],[[0,0],[1,0],[1,1],[2,1]]];
-export type Command='left'|'right'|'rotate'|'down'|'drop';
+export type BlockItem='shield'|'clean'|'attack';
+export const ITEMS:readonly BlockItem[]=['shield','clean','attack'];
+export type Command='left'|'right'|'rotate'|'down'|'drop'|'item-shield'|'item-clean'|'item-attack';
 export type Piece={kind:number;rotation:number;x:number;y:number};
-export type BlockPlayer={id:string;token?:string;name:string;last:number;connection?:{rtt:number;at:number};board:number[];piece:Piece;queue:number[];seed:number;score:number;lines:number;sent:number;pending:number;incomingAt:number;out:boolean;outAt:number;fallAt:number;seq:number;inputAt:number;attackCursor:number};
+export type BlockPlayer={id:string;token?:string;name:string;last:number;connection?:{rtt:number;at:number};board:number[];piece:Piece;queue:number[];seed:number;items?:BlockItem[];itemSeed?:number;shield?:boolean;score:number;lines:number;sent:number;pending:number;incomingAt:number;out:boolean;outAt:number;fallAt:number;seq:number;inputAt:number;attackCursor:number};
 export type BlockRoom={kind:'blocks';practice?:boolean;code:string;host:string;players:BlockPlayer[];phase:'lobby'|'playing'|'result';round:number;start:number;end:number;paused:number;attack:boolean;winner:string};
 export function isBlocks(value:unknown):value is BlockRoom{return !!value&&typeof value==='object'&&'kind' in value&&value.kind==='blocks';}
 function random(p:BlockPlayer){p.seed=(Math.imul(p.seed,1664525)+1013904223)>>>0;return p.seed/4294967296;}
@@ -16,18 +18,41 @@ export function makeBlockRoom(code:string,p:BlockPlayer,attack=true):BlockRoom{r
 export function fallSpeed(p:BlockPlayer){return Math.max(280,850-Math.floor(p.lines/8)*75);}
 export function startBlocks(r:BlockRoom,now:number,seed:number){r.round++;r.phase='playing';r.start=now+3000;r.end=r.start+DURATION;r.paused=0;r.winner='';r.players=r.players.map(p=>({...makeBlockPlayer(p.id,p.name,r.start,seed),token:p.token,last:now}));}
 export function rankings(r:BlockRoom){return [...r.players].sort((a,b)=>Number(a.out)-Number(b.out)||b.score-a.score||b.lines-a.lines||b.outAt-a.outAt);}
-export function finishBlocks(r:BlockRoom,label?:string){r.phase='result';r.paused=0;const order=rankings(r),first=order[0],ties=order.filter(p=>first&&p.out===first.out&&p.score===first.score&&p.lines===first.lines&&(!p.out||p.outAt===first.outAt));r.winner=label||(r.practice?'연습을 마쳤어요':ties.length>1?'공동 우승!':first?first.name+' 승리!':'이번 판이 끝났어요');}
+export function finishBlocks(r:BlockRoom,label?:string){r.phase='result';r.paused=0;const order=rankings(r),first=order[0],ties=order.filter(p=>first&&p.out===first.out&&p.score===first.score&&p.lines===first.lines&&(!p.out||p.outAt===first.outAt));r.winner=label||(r.practice?"연습 완료":ties.length>1?'공동 우승!':first?first.name+' 승리!':"경기 종료");}
+export function itemMode(r:BlockRoom){return !r.attack&&!r.practice;}
+function sendAttack(r:BlockRoom,p:BlockPlayer,amount:number,now:number){
+ const others=r.players.filter(q=>q.id!==p.id&&!q.out);if(!others.length)return false;
+ const target=others[p.attackCursor++%others.length];
+ if(itemMode(r)&&target.shield){target.shield=false;return true;}
+ const accepted=Math.min(amount,20-target.pending);target.pending+=accepted;target.incomingAt=Math.max(target.incomingAt,now+1200);p.sent+=accepted;return true;
+}
+function applyItem(r:BlockRoom,p:BlockPlayer,item:BlockItem,now:number){
+ if(!itemMode(r))return;const index=p.items?.indexOf(item)??-1;if(index<0)return;
+ if(item==='shield'&&p.shield&&!p.pending)return;
+ if(item==='clean'){
+  if(!p.board.slice((ROWS-1)*COLS).some(Boolean))return;
+  const cleaned={...p,board:[...Array(COLS).fill(0),...p.board.slice(0,(ROWS-1)*COLS)]};
+  // Move the falling piece with the settled stack if cleaning would overlap it.
+  if(!fits(cleaned,p.piece)){const shifted={...p.piece,y:p.piece.y+1};if(!fits(cleaned,shifted))return;p.piece=shifted;}
+  p.board=cleaned.board;
+ }else if(item==='shield'){
+  if(p.pending){p.pending=0;p.incomingAt=0;}else p.shield=true;
+ }else if(!sendAttack(r,p,1,now))return;
+ p.items!.splice(index,1);
+}
 function settle(r:BlockRoom,p:BlockPlayer,now:number){
  const squares=cells(p.piece);if(squares.some(([,y])=>y<0)){p.out=true;p.outAt=now;return;}
  for(const [x,y] of squares)p.board[y*COLS+x]=p.piece.kind+1;
  const rows=[];let cleared=0;for(let y=0;y<ROWS;y++){const row=p.board.slice(y*COLS,(y+1)*COLS);if(row.every(Boolean))cleared++;else rows.push(...row);}p.board=[...Array(cleared*COLS).fill(0),...rows];p.lines+=cleared;p.score+=[0,100,300,500,800][cleared]||0;
+ if(itemMode(r)&&cleared>=2&&(p.items?.length||0)<3){p.itemSeed=(Math.imul(p.itemSeed??(p.seed^0x9e3779b9),1664525)+1013904223)>>>0;(p.items??=[]).push(ITEMS[Math.floor(p.itemSeed/4294967296*ITEMS.length)]);}
  let attack=r.attack?([0,0,1,2,4][cleared]||0):0;const cancel=Math.min(attack,p.pending);p.pending-=cancel;attack-=cancel;
- if(attack){const others=r.players.filter(q=>q.id!==p.id&&!q.out);if(others.length){const target=others[p.attackCursor++%others.length];target.pending=Math.min(20,target.pending+attack);target.incomingAt=Math.max(target.incomingAt,now+1200);p.sent+=attack;}}
+ if(attack)sendAttack(r,p,attack,now);
  if(p.pending&&now>=p.incomingAt){const n=Math.min(4,p.pending),hole=Math.floor(random(p)*COLS);if(p.board.slice(0,n*COLS).some(Boolean)){p.out=true;p.outAt=now;}p.board=p.board.slice(n*COLS);for(let i=0;i<n;i++)p.board.push(...Array.from({length:COLS},(_,x)=>x===hole?0:8));p.pending-=n;p.incomingAt=now+1200;}
  if(!p.out)spawn(p,now);
 }
 export function blockCommand(r:BlockRoom,p:BlockPlayer,command:Command,now:number){
  if(r.phase!=='playing'||r.paused||now<r.start||p.out)return;
+ if(command.startsWith('item-')){applyItem(r,p,command.slice(5) as BlockItem,now);return;}
  if(command==='drop'){let n=0;while(fits(p,{...p.piece,y:p.piece.y+1})){p.piece.y++;n++;}p.score+=n*2;settle(r,p,now);return;}
  if(command==='rotate'){const rotated={...p.piece,rotation:(p.piece.rotation+1)%4};for(const [dx,dy] of [[0,0],[-1,0],[1,0],[-2,0],[2,0],[0,-1]]){const trial={...rotated,x:rotated.x+dx,y:rotated.y+dy};if(fits(p,trial)){p.piece=trial;break;}}return;}
  const trial={...p.piece,x:p.piece.x+(command==='left'?-1:command==='right'?1:0),y:p.piece.y+(command==='down'?1:0)};
@@ -42,7 +67,7 @@ export function advanceBlocks(r:BlockRoom,now:number){
  if(now>=r.end||r.players.filter(p=>!p.out).length<=(r.practice?0:1))finishBlocks(r);
 }
 export function pauseBlocks(r:BlockRoom,now:number,paused:boolean){if(r.phase!=='playing')return;if(paused&&!r.paused)r.paused=now;else if(!paused&&r.paused){const delta=now-r.paused;r.end+=delta;r.start+=delta;r.players.forEach(p=>{p.fallAt+=delta;p.incomingAt+=delta;p.last=now;});r.paused=0;}}
-export function publicBlocks(r:BlockRoom){return {...r,players:r.players.map(({token,...p})=>p)};}
-export function boardCells(p:BlockPlayer,ghost=true){const board=[...p.board];if(p.out)return board;let landing={...p.piece};while(fits(p,{...landing,y:landing.y+1}))landing.y++;if(ghost)for(const [x,y] of cells(landing))if(y>=0&&y<ROWS&&!board[y*COLS+x])board[y*COLS+x]=-1;for(const [x,y] of cells(p.piece))if(y>=0&&y<ROWS)board[y*COLS+x]=p.piece.kind+1;return board;}
+export function publicBlocks(r:BlockRoom){return {...r,players:r.players.map(p=>{const safe={...p};delete safe.token;return safe;})};}
+export function boardCells(p:BlockPlayer,ghost=true){const board=[...p.board];if(p.out)return board;const landing={...p.piece};while(fits(p,{...landing,y:landing.y+1}))landing.y++;if(ghost)for(const [x,y] of cells(landing))if(y>=0&&y<ROWS&&!board[y*COLS+x])board[y*COLS+x]=-1;for(const [x,y] of cells(p.piece))if(y>=0&&y<ROWS)board[y*COLS+x]=p.piece.kind+1;return board;}
 
 export function makeBlockPractice(name:string,now:number,seed:number){const r=makeBlockRoom('연습',makeBlockPlayer('practice',name,now,seed),false);r.practice=true;startBlocks(r,now,seed);return r;}

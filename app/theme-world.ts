@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {MAP_SCALE,CEILING_HEIGHT,mapName,type MapId} from './game';
+import {CEILING_HEIGHT,mapName,type MapId} from './game';
 
 // Layout coordinates use the original planning grid. Both the scene builder and
 // server expand that grid by MAP_SCALE, leaving character and brush size alone.

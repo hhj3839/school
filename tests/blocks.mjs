@@ -42,8 +42,16 @@ const manage=action=>call(classroom.POST,'classroom',{action,code:created.room.c
 assert.equal((await manage('pauseRoom')).status,200);r=read();const oldEnd=r.end,oldFall=r.players[0].fallAt;clock+=10000;assert.equal((await manage('resumeRoom')).status,200);r=read();assert.equal(r.end,oldEnd+10000);assert.equal(r.players[0].fallAt,oldFall+10000);
 const summary=await control('status');assert.equal(summary.rooms[0].kind,'blocks');assert.equal(summary.rooms[0].online,4);
 assert.equal((await manage('endRoom')).status,200);assert.equal(read().phase,'result');
+data=await play('mode',{...sessions[0],attack:false});assert.equal(data.room.attack,false);
+assert.ok((await control('status')).rooms[0].mapName.includes('아이템 모드'));
 data=await play('start',sessions[0]);assert.equal(data.room.round,2);assert.equal(data.room.players[0].score,0);assert.equal(data.room.players[0].seq,0);
 clock+=3100;const before=read().players[0].score;data=await play('input',{...sessions[0],round:1,commands:[{seq:5,key:'drop'}]});assert.equal(data.room.players[0].score,before,'previous-round inputs ignored');
+r=read();r.players[0].items=['attack'];r.players[2].items=['attack'];r.players[2].attackCursor=1;save(r);clock+=600;
+const simultaneous=await Promise.all([0,2].map(i=>play('input',{...sessions[i],round:2,commands:[{seq:1,key:'item-attack'}]})));assert.ok(simultaneous.every(d=>d.status===200));r=read();assert.equal(r.players[1].pending,2,'concurrent item attacks are not lost');assert.equal(r.players[0].items.length,0);assert.equal(r.players[2].items.length,0);
+await play('input',{...sessions[0],round:2,commands:[{seq:1,key:'item-attack'}]});assert.equal(read().players[1].pending,2,'retry does not reuse item');
+r=read();r.players[1].items=['shield'];save(r);clock+=600;data=await play('input',{...sessions[1],round:2,commands:[{seq:1,key:'item-shield'}]});assert.equal(data.room.players[1].pending,0);assert.equal(data.room.players[1].items.length,0);
+r=read();r.players[0].items=['clean'];r.players[0].board[195]=8;save(r);clock+=600;data=await play('input',{...sessions[0],round:2,commands:[{seq:2,key:'item-clean'}]});assert.equal(data.room.players[0].items.length,0);assert.equal(data.room.players[0].board.includes(8),false);
+console.log('PASS: HTTP item mode, teacher label, concurrent attacks, retry deduplication, shield and cleaning');
 const hide=await import('../app/api/room/route.ts');assert.equal((await call(hide.POST,'room',{action:'state',...sessions[0]})).status,409);
 await play('leave',sessions[0]);assert.notEqual(read().host,created.id);
 assert.equal((await control('close')).open,false);assert.equal((await play('state',sessions[1])).status,423);await control('open');assert.equal((await play('state',sessions[1])).status,404);
@@ -53,6 +61,6 @@ console.log('PASS: 4-player capacity, free student creation, shared teacher cont
 const {makeBlockPlayer,makeBlockRoom,startBlocks,blockCommand,advanceBlocks,fits}=engine;
 const a=makeBlockPlayer('a','A',clock,1),b=makeBlockPlayer('b','B',clock,2),match=makeBlockRoom('ABC234',a,false);match.players.push(b);startBlocks(match,clock,123);const t=match.start+10,one=match.players[0],two=match.players[1];
 for(let kind=0;kind<7;kind++)for(let rotation=0;rotation<4;rotation++){one.piece={kind,rotation,x:3,y:0};assert.equal(fits(one,one.piece),true);for(let i=0;i<15;i++)blockCommand(match,one,'left',t);assert.equal(fits(one,one.piece),true);blockCommand(match,one,'rotate',t);assert.equal(fits(one,one.piece),true);}
-one.board=Array(200).fill(0);for(let x=0;x<10;x++)if(x<3||x>6)one.board[190+x]=1;one.piece={kind:0,rotation:0,x:3,y:0};blockCommand(match,one,'drop',t);assert.equal(one.lines,1);assert.equal(two.pending,0,'score mode sends no garbage');assert.equal(one.board.some(Boolean),false);
+one.board=Array(200).fill(0);for(let x=0;x<10;x++)if(x<3||x>6)one.board[190+x]=1;one.piece={kind:0,rotation:0,x:3,y:0};blockCommand(match,one,'drop',t);assert.equal(one.lines,1);assert.equal(two.pending,0,'item mode does not auto-send garbage');assert.equal(one.board.some(Boolean),false);
 one.fallAt=two.fallAt=match.end+1000;one.last=two.last=match.end;advanceBlocks(match,match.end);assert.equal(match.phase,'result');assert.equal(match.winner,'A 승리!');
-console.log('PASS: seven shapes, rotations, wall boundaries, row removal, score mode and timed ranking');
+console.log('PASS: seven shapes, rotations, wall boundaries, row removal, item mode and timed ranking');

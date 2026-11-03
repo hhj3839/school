@@ -16,7 +16,7 @@ const control=(action,key='test-only-secret',origin)=>call(classroom.POST,'class
 const play=(action,data={})=>call(room.POST,'room',{action,...data});
 
 const h=await play('create',{name:'복구 테스트'});const session={code:h.room.code,id:h.id,token:h.token};
-const g=await play('join',{code:h.room.code,name:'친구'});
+await play('join',{code:h.room.code,name:'친구'});
 await play('next',session);
 const before=await play('state',session);
 let stored=JSON.parse(sql.prepare('SELECT state FROM rooms WHERE code=?').get(session.code).state);

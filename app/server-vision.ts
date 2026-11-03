@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import {geometry} from './solid-renderer';
+import * as THREE from './three-server';
+import {geometry} from './solid-geometry';
 import {coverShape} from './cover-layout';
 import {applyPoseRig,poseLift} from './pose-rig';
 import {mapGround,mapCover,areaWalls,roomSettings,SHOT_RANGE,poseHeight,type Room,type Player} from './game';

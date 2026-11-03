@@ -1,9 +1,9 @@
 import './resolve-ts.mjs';
 import assert from 'node:assert/strict';
-const {practiceRace,stepRacer,MOVERS,moverX,STEP,WALL_HEIGHT}=await import('../app/race/engine.ts');
+const {practiceRace,stepRacer,MOVERS,moverX,STEP,WALL_HEIGHT,MOVER_RATE}=await import('../app/race/engine.ts');
 const z=MOVERS[0],idle={seq:1,x:0,z:0,jump:false};
 function contact(phase,height=0){
- const t=(phase-z+Math.ceil(z/(2*Math.PI))*2*Math.PI)/1.6;
+ const t=(phase-z+Math.ceil(z/(2*Math.PI))*2*Math.PI)/MOVER_RATE;
  const r=practiceRace('벽 밀기',10000),p=r.players[0],at=r.start+t*1000;
  const previous=moverX(t-.05,z),current=moverX(t,z),direction=Math.sign(current-previous);
  p.x=previous+direction*2.86;p.z=z;p.y=height;p.vy=height? .9:0;

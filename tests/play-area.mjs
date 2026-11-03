@@ -10,13 +10,12 @@ globalThis.__testEnv={TEACHER_KEY:'test-only-secret',DB:{
  async batch(statements){sql.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}}
 }};
 registerHooks({resolve(s,c,next){if(s==='cloudflare:workers')return {url:'test:cloudflare',shortCircuit:true};try{return next(s,c)}catch(e){if(s.startsWith('.'))return next(s+'.ts',c);throw e;}},load(url,c,next){if(url==='test:cloudflare')return {format:'module',source:'export const env=globalThis.__testEnv;',shortCircuit:true};return next(url,c);}});
-const classroom=await import('../app/api/classroom/route.ts'),room=await import('../app/api/room/route.ts');
+const room=await import('../app/api/room/route.ts');
 async function call(handler,path,body,key,origin='http://localhost'){const response=await handler(new Request('http://localhost/api/'+path,{method:'POST',headers:{'Content-Type':'application/json',Origin:origin,...(key?{Authorization:'Bearer '+key}:{})},body:JSON.stringify(body)}));return {status:response.status,...await response.json()};}
-const control=(action,key='test-only-secret',origin)=>call(classroom.POST,'classroom',{action},key,origin);
 const play=(action,data={})=>call(room.POST,'room',{action,...data});
 
 const game=await import('../app/game.ts');
-const {MAPS,areaForCount,roomBounds,areaWalls,areaName,makeRoom,makePlayer,nextPhase,canStand,move,MAX_ELEVATION,MAP_SCALE}=game;
+const {MAPS,roomBounds,areaWalls,makeRoom,makePlayer,nextPhase,canStand,MAX_ELEVATION,MAP_SCALE}=game;
 for(const count of [2,6,7,12,13,20])for(const {id} of MAPS){
  const r=makeRoom('ARE222',makePlayer('0','0',Date.now()));r.settings={...game.DEFAULT_SETTINGS,maxPlayers:20,mapId:id};for(let i=1;i<count;i++)r.players.push(makePlayer(String(i),String(i),Date.now()));nextPhase(r,Date.now());assert.equal(r.playArea,count<=6?'small':count<=12?'medium':'full');const b=roomBounds(r);
  for(const p of r.players)assert.ok(canStand(p.x,p.y,id,0,1.7,b),id+' spawn within area');

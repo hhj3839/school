@@ -1,11 +1,11 @@
 'use client';
-import {useEffect,useRef,useState,type MutableRefObject} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState,type MutableRefObject} from 'react';
 import {brushContains,type BrushShape} from './brush';
 import * as THREE from 'three';
 import {solidRenderer} from './solid-renderer';
 import {buildTheme} from './theme-world';
 import {applyPoseRig,poseLift,poseCenter} from './pose-rig';
-import {spectatorPlayers,roomBounds,areaWalls,hidingSpots,showHidingHints,mapGround,mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,mapObstacles,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,defaultPaint,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
+import {spectatorPlayers,roomBounds,areaWalls,hidingSpots,showHidingHints,mapGround,mapCover,MAP_SCALE,CEILING_HEIGHT,roomSettings,WALLS,OBSTACLE_HEIGHTS,CAMO_PROPS,SHOT_RANGE,makePlayer,PAINT_SIZE,type Room,type Player,type Pose} from './game';
 export type SceneInput={dx:number;dy:number;dz?:number;yaw:number;pitch?:number};
 export type ViewMode='move'|'paint'|'look';
 export type SceneHandle={centerTarget:()=>string;shoot:()=>string;previewView:(side:number)=>void;resetView:()=>void;rotateView:(delta:number)=>void;zoom:(delta:number)=>void};
@@ -29,14 +29,18 @@ function mannequin(p:Player){const group=new THREE.Group(),tex=paintTexture(p.pa
  return {group,meshes,left,right,mat,label,labelTexture,...tex,paintKey:p.paint.join(''),paintRef:p.paint,pose:'stand' as Pose,poseKey:''};
 }
 function setPose(model:ReturnType<typeof mannequin>,pose:Pose,leftArm?:number,rightArm?:number){const key=pose+':'+leftArm+':'+rightArm;if(model.poseKey===key)return;model.poseKey=key;model.pose=pose;applyPoseRig(model.group,model.meshes,pose,leftArm,rightArm);}
-export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),current=useRef(props),[failed,setFailed]=useState(false);current.current=props;
- useEffect(()=>{if(!host.current)return;const container=host.current;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:!props.lightMode,alpha:false});}catch{setFailed(true);return;}
- renderer.setPixelRatio(props.lightMode?1:Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=!props.lightMode;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label','3D 숨바꼭질 맵: 드래그로 둘러보고 캐릭터에 직접 색칠하세요');renderer.domElement.tabIndex=0;
- const scene=new THREE.Scene();scene.background=new THREE.Color('#bcc6be');scene.fog=new THREE.Fog('#bcc6be',32,65);const camera=new THREE.PerspectiveCamera(58,1,.04,90);scene.add(new THREE.HemisphereLight('#ffefd4','#83908c',2));const sun=new THREE.DirectionalLight('#ffdfb2',2.4);sun.position.set(4,9,6);sun.castShadow=!props.lightMode;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-10;scene.add(sun);
+export function WorldView({api:apiRef,...props}:Props){const host=useRef<HTMLDivElement>(null),current=useRef(props),[failed,setFailed]=useState(false);useLayoutEffect(()=>{current.current=props;},[props]);
+ // Parent key owns scene lifetime (map, play area, graphics mode). Per-frame state comes from current.
+ useEffect(()=>{if(!host.current)return;const initial=current.current;const container=host.current;let renderer:THREE.WebGLRenderer;try{renderer=new THREE.WebGLRenderer({antialias:!initial.lightMode,alpha:false});}catch{
+ // WebGL initialization is an external API failure, reported once per scene setup.
+ // eslint-disable-next-line react-hooks/set-state-in-effect -- Surface renderer creation failure to the user.
+ setFailed(true);return;}
+ renderer.setPixelRatio(initial.lightMode?1:Math.min(devicePixelRatio,1.8));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=!initial.lightMode;renderer.shadowMap.type=THREE.PCFSoftShadowMap;container.appendChild(renderer.domElement);renderer.domElement.setAttribute('aria-label',"3D 숨바꼭질 · 드래그 시점 이동 · 캐릭터 색칠");renderer.domElement.tabIndex=0;
+ const scene=new THREE.Scene();scene.background=new THREE.Color('#bcc6be');scene.fog=new THREE.Fog('#bcc6be',32,65);const camera=new THREE.PerspectiveCamera(58,1,.04,90);scene.add(new THREE.HemisphereLight('#ffefd4','#83908c',2));const sun=new THREE.DirectionalLight('#ffdfb2',2.4);sun.position.set(4,9,6);sun.castShadow=!initial.lightMode;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-10;scene.add(sun);
  const blockers:THREE.Mesh[]=[],surfaces:THREE.Mesh[]=[],textures:THREE.Texture[]=[];
  function material(type:'brick'|'wood'|'leaf'|'floor'|'blue',rx=1,ry=1){const t=textureCanvas(type);t.repeat.set(rx,ry);textures.push(t);return new THREE.MeshStandardMaterial({map:t,roughness:1,metalness:0});}
  function box(x:number,y:number,z:number,w:number,h:number,d:number,mat:THREE.Material,solid=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w*MAP_SCALE,h,d*MAP_SCALE),mat);m.position.set(x*MAP_SCALE,y,z*MAP_SCALE);m.receiveShadow=true;m.castShadow=true;scene.add(m);surfaces.push(m);if(solid)blockers.push(m);return m;}
- const mapId=props.room?roomSettings(props.room).mapId:'art';
+ const mapId=initial.room?roomSettings(initial.room).mapId:'art';
  if(mapId==='art'){
  box(9,-.08,5.7,18,.16,11.4,material('floor',7.5,4.5));
  box(9,CEILING_HEIGHT/2,0,18,CEILING_HEIGHT,.15,material('brick',9,3.3));box(0,CEILING_HEIGHT/2,5.7,.15,CEILING_HEIGHT,11.4,material('wood',1,3.2));box(18,CEILING_HEIGHT/2,5.7,.15,CEILING_HEIGHT,11.4,material('brick',5.7,3.3));box(9,CEILING_HEIGHT/2,11.4,18,CEILING_HEIGHT,.15,material('wood',9,3.3));
@@ -86,16 +90,16 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  const drawSolids=solidRenderer(scene,surfaces,blockers);
  drawSolids(mapGround(mapId).filter(o=>mapId!=='art'||o.kind!=='art'),true);
  drawSolids(mapCover(mapId));
- const boundaryParts=areaWalls(props.room);drawSolids(boundaryParts);
+ const boundaryParts=areaWalls(initial.room);drawSolids(boundaryParts);
  for(const wall of boundaryParts){
   const cv=document.createElement('canvas');cv.width=512;cv.height=128;const ctx=cv.getContext('2d')!;ctx.fillStyle='#f4d572';ctx.fillRect(0,0,512,128);ctx.fillStyle='#263627';ctx.font='bold 38px sans-serif';ctx.textAlign='center';ctx.fillText('여기까지 놀이 구역',256,78);const tex=new THREE.CanvasTexture(cv);textures.push(tex);const mat=new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide});const sign=new THREE.Mesh(new THREE.PlaneGeometry(4,.95),mat);sign.position.set((wall.x+wall.w/2)/100,2.6,(wall.y+wall.h/2)/100);if(wall.w===16){sign.rotation.y=-Math.PI/2;sign.position.x=wall.x/100-.02;}else sign.position.z=wall.y/100-.02;scene.add(sign);
  }
- const playBounds=roomBounds(props.room);
+ const playBounds=roomBounds(initial.room);
  const hintGroup=new THREE.Group();scene.add(hintGroup);
  for(const [i,spot] of hidingSpots(mapId).filter(s=>s.x<playBounds.width-28&&s.y<playBounds.height-28).entries()){
   const cv=document.createElement('canvas');cv.width=256;cv.height=128;const ctx=cv.getContext('2d')!;ctx.fillStyle='#d0ec92';ctx.beginPath();ctx.roundRect(4,4,248,120,24);ctx.fill();ctx.fillStyle='#193526';ctx.font='bold 30px sans-serif';ctx.textAlign='center';ctx.fillText((i+1)+' · '+spot.label,128,58);ctx.font='22px sans-serif';ctx.fillText('나에게만 보이는 안내',128,96);const tex=new THREE.CanvasTexture(cv);textures.push(tex);const marker=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,depthWrite:false,opacity:.88,transparent:true}));marker.position.set(spot.x/100,spot.elevation+1.3,spot.y/100);marker.scale.set(2.4,1.2,1);marker.renderOrder=10;hintGroup.add(marker);
  }
- const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,startX=0,startY=0,paintDrag=false,button=0;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let wasPreview=false;let targetCenter=new THREE.Vector3(5.8,1,1.1);
+ const models=new Map<string,ReturnType<typeof mannequin>>(),ray=new THREE.Raycaster(),pointer=new THREE.Vector2();let yaw=0,pitch=.16,distance=3.1,last=performance.now(),frame=0,down=false,lastX=0,lastY=0,paintDrag=false;let activePointer:number|null=null;let previousPaintPoint:{u:number;v:number;mesh:number}|null=null;let wasPreview=false;const targetCenter=new THREE.Vector3(5.8,1,1.1);
  const lateMarker=new THREE.Mesh(new THREE.TorusGeometry(2.8,.08,6,32),new THREE.MeshBasicMaterial({color:'#ffe28a',transparent:true,opacity:.7,depthTest:false,depthWrite:false}));lateMarker.rotation.x=Math.PI/2;lateMarker.visible=false;scene.add(lateMarker);
  function cast(clientX:number,clientY:number){const rect=renderer.domElement.getBoundingClientRect();pointer.set((clientX-rect.left)/rect.width*2-1,-(clientY-rect.top)/rect.height*2+1);ray.setFromCamera(pointer,camera);return ray.intersectObjects([...surfaces,...Array.from(models.values()).filter(m=>m.group.visible).flatMap(m=>m.meshes)],false);}
  function targetAt(x:number,y:number){const hits=cast(x,y),hit=hits[0];return hit?.object.userData.playerId||'';}
@@ -107,7 +111,7 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  const muzzle=new THREE.Mesh(new THREE.SphereGeometry(.065,8,6),new THREE.MeshBasicMaterial({color:'#fff5ad',transparent:true,opacity:.9}));muzzle.position.set(0,.01,-.28);blaster.add(muzzle);muzzle.visible=false;
  const beam=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),new THREE.LineBasicMaterial({color:'#ffdc72',transparent:true,opacity:.85}));scene.add(beam);beam.visible=false;let shotAt=-1000;
  function shoot(){const c=current.current,r=c.room,p=r?.players.find(p=>p.id===c.id);if(r?.phase!=='seek'||r.paused||p?.role!=='seeker'||p.caught)return '';const rect=renderer.domElement.getBoundingClientRect(),hit=cast(rect.left+rect.width/2,rect.top+rect.height/2)[0];const destination=hit&&hit.distance<=SHOT_RANGE/100?hit.point:ray.ray.at(SHOT_RANGE/100,new THREE.Vector3());const source=muzzle.getWorldPosition(new THREE.Vector3());const pos=beam.geometry.getAttribute('position');pos.setXYZ(0,source.x,source.y,source.z);pos.setXYZ(1,destination.x,destination.y,destination.z);pos.needsUpdate=true;beam.geometry.computeBoundingSphere();shotAt=performance.now();return hit&&hit.distance<=SHOT_RANGE/100?hit.object.userData.playerId||'':'';}
- props.api.current={shoot,previewView:(side)=>{yaw=(current.current.room?.players.find(p=>p.id===current.current.id)?.angle||0)+side;},centerTarget:()=>{const rect=renderer.domElement.getBoundingClientRect();return targetAt(rect.left+rect.width/2,rect.top+rect.height/2);},resetView:()=>{yaw=current.current.preview?(current.current.room?.players.find(p=>p.id===current.current.id)?.angle||0):0;pitch=.16;distance=3.1;},rotateView:(delta)=>{yaw+=delta;previousPaintPoint=null;},zoom:(delta)=>{distance=Math.max(1.4,Math.min(5,distance+delta));}};
+ apiRef.current={shoot,previewView:(side)=>{yaw=(current.current.room?.players.find(p=>p.id===current.current.id)?.angle||0)+side;},centerTarget:()=>{const rect=renderer.domElement.getBoundingClientRect();return targetAt(rect.left+rect.width/2,rect.top+rect.height/2);},resetView:()=>{yaw=current.current.preview?(current.current.room?.players.find(p=>p.id===current.current.id)?.angle||0):0;pitch=.16;distance=3.1;},rotateView:(delta)=>{yaw+=delta;previousPaintPoint=null;},zoom:(delta)=>{distance=Math.max(1.4,Math.min(5,distance+delta));}};
  function brushAt(x:number,y:number){
  const c=current.current,hit=cast(x,y)[0];
  if(!hit||hit.object.userData.playerId!==c.id||!hit.uv){previousPaintPoint=null;return false;}
@@ -124,7 +128,7 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  try{camera.setViewOffset(rect.width,rect.height,Math.floor(x-rect.left),Math.floor(y-rect.top),1,1);renderer.setRenderTarget(target);renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,1,1,pixel);current.current.onPick('#'+Array.from(pixel.slice(0,3),v=>v.toString(16).padStart(2,'0')).join(''));}
  finally{renderer.setRenderTarget(null);camera.clearViewOffset();target.dispose();renderer.render(scene,camera);}
  }
- function pointerDown(e:PointerEvent){if(activePointer!==null)return;activePointer=e.pointerId;if(current.current.picking&&e.button===0){sampleColor(e.clientX,e.clientY);activePointer=null;return;}renderer.domElement.focus();renderer.domElement.setPointerCapture(e.pointerId);down=true;button=e.button;lastX=startX=e.clientX;lastY=startY=e.clientY;paintDrag=false;previousPaintPoint=null;if(current.current.mode==='paint'&&e.button!==2&&targetAt(e.clientX,e.clientY)===current.current.id){current.current.onStroke();paintDrag=brushAt(e.clientX,e.clientY);}}
+ function pointerDown(e:PointerEvent){if(activePointer!==null)return;activePointer=e.pointerId;if(current.current.picking&&e.button===0){sampleColor(e.clientX,e.clientY);activePointer=null;return;}renderer.domElement.focus();renderer.domElement.setPointerCapture(e.pointerId);down=true;lastX=e.clientX;lastY=e.clientY;paintDrag=false;previousPaintPoint=null;if(current.current.mode==='paint'&&e.button!==2&&targetAt(e.clientX,e.clientY)===current.current.id){current.current.onStroke();paintDrag=brushAt(e.clientX,e.clientY);}}
  function pointerMove(e:PointerEvent){if(!down||e.pointerId!==activePointer)return;if(current.current.room?.players.find(p=>p.id===current.current.id)?.caught)return;const dx=e.clientX-lastX,dy=e.clientY-lastY;lastX=e.clientX;lastY=e.clientY;if(paintDrag)brushAt(e.clientX,e.clientY);else if(!(current.current.cameraLocked&&current.current.mode==='paint')){const aiming=current.current.room?.phase==='seek'&&current.current.room?.players.find(p=>p.id===current.current.id)?.role==='seeker';yaw-=dx*(aiming?.0035:.006);pitch=Math.max(-.35,Math.min(.95,pitch+dy*(aiming?.0025:.004)));}}
  function pointerUp(e:PointerEvent){if(e.pointerId!==activePointer)return;activePointer=null;down=false;paintDrag=false;}
  function wheel(e:WheelEvent){e.preventDefault();distance=Math.max(1.4,Math.min(5,distance+e.deltaY*.003));}
@@ -140,9 +144,9 @@ export function WorldView(props:Props){const host=useRef<HTMLDivElement>(null),c
  else if(c.preview){const eye=new THREE.Vector3(mine.x/100,1.48,mine.y/100),dir=new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw));ray.set(eye,dir);const obstruction=ray.intersectObjects(blockers,false).find(h=>h.distance>.08);const dist=obstruction?Math.min(c.previewDistance,Math.max(.3,obstruction.distance-.2)):c.previewDistance;camera.position.copy(eye).addScaledVector(dir,dist);camera.lookAt(targetCenter);}
  else{const aim=targetCenter.clone(),viewPitch=pitch,viewDistance=distance,dir=new THREE.Vector3(Math.sin(yaw)*Math.cos(viewPitch),Math.sin(viewPitch),Math.cos(yaw)*Math.cos(viewPitch));ray.set(aim,dir);const obstruction=ray.intersectObjects(blockers,false).find(h=>h.distance>.08);const dist=obstruction?Math.min(viewDistance,Math.max(.25,obstruction.distance-.15)):viewDistance;camera.position.copy(aim).addScaledVector(dir,dist);camera.lookAt(aim);}
  blaster.visible=first&&!c.reveal&&!r?.paused;const firing=time-shotAt<130;muzzle.visible=firing;beam.visible=firing&&blaster.visible;blaster.position.z=-.43+(firing?.045:0);renderer.render(scene,camera);frame=requestAnimationFrame(render);}
- frame=requestAnimationFrame(render);return()=>{cancelAnimationFrame(frame);resize.disconnect();props.api.current=null;models.forEach(m=>{m.mat.dispose();m.texture.dispose();m.label.material.dispose();m.labelTexture.dispose();});scene.traverse(o=>{if(o instanceof THREE.Sprite)o.material.dispose();if(o instanceof THREE.Mesh){o.geometry.dispose();if(!Array.isArray(o.material))o.material.dispose();}});beam.geometry.dispose();beam.material.dispose();textures.forEach(t=>t.dispose());renderer.dispose();canvas.remove();};
- },[]);
- return <div className={"world-canvas "+(props.picking?'picking':props.mode==='paint'?'painting':'')} ref={host}>{failed&&<div className="graphics-error">이 브라우저에서 3D 화면을 열 수 없어요. WebGL을 지원하는 최신 브라우저로 열어 주세요.</div>}</div>;
+ frame=requestAnimationFrame(render);return()=>{cancelAnimationFrame(frame);resize.disconnect();apiRef.current=null;models.forEach(m=>{m.mat.dispose();m.texture.dispose();m.label.material.dispose();m.labelTexture.dispose();});scene.traverse(o=>{if(o instanceof THREE.Sprite)o.material.dispose();if(o instanceof THREE.Mesh){o.geometry.dispose();if(!Array.isArray(o.material))o.material.dispose();}});beam.geometry.dispose();beam.material.dispose();textures.forEach(t=>t.dispose());renderer.dispose();canvas.remove();};
+ },[apiRef]);
+ return <div className={"world-canvas "+(props.picking?'picking':props.mode==='paint'?'painting':'')} ref={host}>{failed&&<div className="graphics-error">3D 표시 불가 · WebGL 지원 브라우저 필요</div>}</div>;
 }
 
 
