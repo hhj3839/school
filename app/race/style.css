@@ -12,3 +12,6 @@
 .race-sector{position:absolute;top:138px;left:20px;max-width:40%;padding:8px 12px;border:1px solid #ffffff;border-radius:14px;font-size:13px;font-weight:800;pointer-events:none}.racer-label.recovering{background:#e9fff4;border:3px solid #5ccba5;box-shadow:0 0 20px #8affd9;display:flex;flex-direction:column;align-items:center;padding:8px 14px}.racer-label.recovering b{display:block;text-align:center;font-size:40px;line-height:1.1;color:#24715d}.racer-label.recovering small{font-size:12px}
 
 .race-page .race-quality{position:absolute;left:20px;top:182px;z-index:4;min-height:44px;font-size:12px;padding:8px 12px;background:#fffdf0e8}.race-quality[aria-pressed=true]{border-color:#59ae94;background:#e1f4e8}@media(max-height:650px){.race-page .race-quality{top:178px;min-height:44px}}
+
+/* Transform-only projection keeps racer labels out of the layout loop. */
+.racer-label{left:0;top:0}

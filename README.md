@@ -175,3 +175,13 @@ TypeScript 검사 및 Worker 빌드 통과. 6명의 동시 입장, 색칠/자세
 - 빌드된 로컬 Worker를 Chrome에서 실행해 숨바꼭질 3D 렌더링·이동·높이·직접 색칠·숨기, 운동회 3D 렌더링·이동·점프, 블록 이동·회전·놓기·점수 반영을 확인했습니다. 세 게임의 조작 안내 완료 및 브라우저 콘솔 오류 없음 확인. 실제 태블릿 성능과 학교 네트워크는 이번 검증 범위에 포함하지 않았습니다.
 - 기록: `outputs/bundle-before.json`, `outputs/bundle-after.json`, `outputs/build-bundle-split.txt`, `outputs/regression-bundle-split.txt`, `outputs/maps-bundle-split.txt`, `outputs/bundle-hideout.png`, `outputs/bundle-race.png`. 커밋·push·배포는 수행하지 않았습니다.
 - 분할 옵션 참고: [Rolldown codeSplitting](https://rolldown.rs/reference/OutputOptions.codeSplitting).
+
+### 운동회 렌더링 최적화 (2026-11-03)
+
+- 트랙 리본을 40m 단위로 나누고 배치에 코스 위치를 부여했습니다. 이전에는 코스 위치가 없는 리본들이 하나의 넓은 배치에 묶여 화면 밖 트랙도 렌더링됐습니다. 고정 배치의 매 프레임 로컬 행렬 재계산도 생략합니다.
+- 이름표는 캐시한 화면 크기와 transform으로 초당 10회 위치를 갱신합니다. 프레임마다 각 이름표의 left/top 쓰기와 clientWidth/clientHeight 읽기를 교차하던 경로를 제거했습니다. 이동·충돌·장애물 판정과 네트워크 입력 주기는 변경하지 않았습니다.
+- 30FPS 제한의 시간 누적 오차를 줄이고 숨겨진 문서에서는 렌더링을 쉽니다. 250ms 초과 프레임 호출 공백은 계측에 남기되 해상도 하향 판단에서 제외합니다. 충분한 여유가 생기면 해상도를 복구합니다. DOM 계측에 cpuFrameMs(렌더 호출까지의 CPU 작업 시간, GPU 완료 시간이 아님)와 schedulingStalls를 추가했습니다.
+- 로컬 프로덕션: 혼자 연습 가로·세로 표본 30FPS, CPU 약 0.4~0.6ms, 출발 구간 삼각형 약 9,300 → 2,400개. 20인 화면에서는 1FPS 표본도 재현됐으나 CPU 약 1ms와 긴 호출 공백이 동반됐고, 정상 호출 구간은 30FPS였습니다. 브라우저 스케줄링/자동화 환경의 영향까지 앱 렌더링 문제로 단정하지 않습니다.
+- 브라우저 1명+HTTP 19명으로 로컬 90초 시험: 4,543건 모두 HTTP 200, 입력 25,797개 처리, 오류 0, p95 81ms. 가로·세로 전환, 이동·점프, 20명 상태 유지 확인. CSS viewport는 브라우저 배율 보정 후 약 1023×767 및 767×1023이며, 실제 태블릿 GPU·다중 터치 검증은 별도입니다.
+- 회귀 검사 18개 및 타입 검사, Worker/Vercel 프로덕션 빌드와 번들 상한 검사 통과. 생성된 `.vercel-frontend` 복사본/빌드 산출물은 ESLint 대상에서 제외했습니다.
+- 재현: 브라우저로 시험 방을 만든 뒤 `node tests/race-browser-load.mjs <origin> <code> 90`으로 19명을 참가시키고 브라우저에서 시작합니다. 봇은 자동 퇴장하며 방장은 UI로 퇴장합니다. 실제 사이트에서는 시험 방만 사용합니다.

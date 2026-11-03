@@ -22,7 +22,7 @@ export function batchMeshes(parent:THREE.Object3D,excluded:Set<THREE.Object3D>,o
  for(const {material,parts} of groups.values()){
   const geometry=mergeGeometries(parts,false);parts.forEach(part=>part.dispose());
   if(!geometry)throw new Error('Unable to batch race geometry');
-  geometry.computeBoundingSphere();owned.push(geometry);parent.add(new THREE.Mesh(geometry,material));
+  geometry.computeBoundingSphere();owned.push(geometry);const mesh=new THREE.Mesh(geometry,material);mesh.matrixAutoUpdate=false;parent.add(mesh);
  }
  return groups.size;
 }
