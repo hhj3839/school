@@ -185,3 +185,12 @@ TypeScript 검사 및 Worker 빌드 통과. 6명의 동시 입장, 색칠/자세
 - 브라우저 1명+HTTP 19명으로 로컬 90초 시험: 4,543건 모두 HTTP 200, 입력 25,797개 처리, 오류 0, p95 81ms. 가로·세로 전환, 이동·점프, 20명 상태 유지 확인. CSS viewport는 브라우저 배율 보정 후 약 1023×767 및 767×1023이며, 실제 태블릿 GPU·다중 터치 검증은 별도입니다.
 - 회귀 검사 18개 및 타입 검사, Worker/Vercel 프로덕션 빌드와 번들 상한 검사 통과. 생성된 `.vercel-frontend` 복사본/빌드 산출물은 ESLint 대상에서 제외했습니다.
 - 재현: 브라우저로 시험 방을 만든 뒤 `node tests/race-browser-load.mjs <origin> <code> 90`으로 19명을 참가시키고 브라우저에서 시작합니다. 봇은 자동 퇴장하며 방장은 UI로 퇴장합니다. 실제 사이트에서는 시험 방만 사용합니다.
+
+### 간헐적 프레임 콜백 지연 진단 (2026-11-03)
+
+- `/race?raceDiagnostics=1`에서만 콜백 간격, 타이머 지연, visibility/focus, Long Tasks 및 Long Animation Frames를 제한된 개수로 기록합니다. 이름·토큰·스크립트 URL을 수집하거나 외부 전송하지 않습니다. 일반 접속에서는 추가 관찰 타이머가 없습니다.
+- 로컬 Chrome에서 약 1001ms의 프레임 콜백 간격을 재현했습니다. 같은 구간의 250ms 타이머 최대 지연은 14ms, 긴 애니메이션 프레임의 blockingDuration은 0ms였습니다. 페이지는 visible/focused 상태였습니다. 따라서 이 재현은 1초짜리 게임 계산보다 브라우저 렌더 콜백 제한과 일치합니다. OS 창 가림·브라우저/자동화 정책 중 정확한 원인까지 특정하지는 못했습니다.
+- 50ms마다 수행하던 방 전체 structuredClone을 내 캐릭터 및 완주 목록 복사로 바꿨습니다. 다른 참가자는 불변 참조를 공유합니다. 20인 상태에서 물리 결과와 원본 불변성을 검증했습니다. 복사만의 로컬 1만 회 측정은 258.36ms → 2.70ms이며 전체 게임 FPS의 개선 배율을 의미하지 않습니다.
+- 숨김·freeze·pagehide 시 렌더 예약을 취소하고 복귀 시 하나의 루프만 시작합니다. 밀린 프레임을 몰아서 실행하지 않습니다. 250ms 초과 공백 이후 캐릭터·카메라는 현재 상태로 맞춰 오래된 위치를 따라가는 지연을 줄입니다.
+- 브라우저 자체의 렌더링 제한을 해제하거나 우회하지 않습니다. 실물 태블릿 GPU·발열과 OS 창 가림 환경의 검증은 별도입니다. lifecycle 취소/재개, 20인 예측·완주 목록 불변성 회귀 테스트: `node tests/race-scheduling.mjs`.
+- 참고: [Chrome Page Lifecycle](https://developer.chrome.com/docs/web-platform/page-lifecycle-api), [Long Animation Frames](https://developer.chrome.com/docs/web-platform/long-animation-frames).

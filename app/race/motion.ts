@@ -1,5 +1,11 @@
 import {STEP,INPUT_LIMIT,stepRacer,type RaceRoom,type RaceInput} from './engine';
 
+// Prediction mutates only this racer and may append a finisher. Other racers
+// and historical finishers are immutable here; avoid cloning all 20 at 20 Hz.
+export function predictionRoom(room:RaceRoom,id:string){
+ return {...room,players:room.players.map(p=>p.id===id?{...p}:p),finishers:room.finishers?.slice()};
+}
+
 // A full network queue must retain a button tap until an input slot is available.
 export function queueRaceInput(commands:RaceInput[],input:{x:number;z:number;jump:boolean},seq:number){
  if(commands.length>=INPUT_LIMIT)return null;
